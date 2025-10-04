@@ -13,6 +13,7 @@ use ratatui::Terminal;
 use crate::console_interface::{cleanup_terminal, handle_input, parse_level, render_game, setup_terminal};
 use crate::core::{step, GameState, GameUpdate, UserAction};
 use crate::models::GameRenderState;
+use crate::state_graph::{get_graph_info, populate_step, render_graph, PopulateResult, StateGraph};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A tiny built-in level (Sokoban-like)
@@ -31,12 +32,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let game_state = parse_level(level);
     let mut terminal = setup_terminal()?;
 
-    run_interactive(game_state, &mut terminal)?;
-
-    cleanup_terminal()?;
+    run_state_graph(game_state, &mut terminal)?;
+    // run_interactive(game_state, &mut terminal)?;
     Ok(())
 }
 
+fn run_state_graph(game_state: GameState, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut state_graph = StateGraph::new();
+    state_graph.upsert_state(game_state);
+    render_graph(terminal, &state_graph)?;
+
+    'outer: loop {
+        let stop_time = std::time::Instant::now() + std::time::Duration::from_millis(100);
+        while std::time::Instant::now() < stop_time {
+            let PopulateResult::Populated(populated_node) = populate_step(&mut state_graph) else {
+                break 'outer;
+            };
+        }
+        render_graph(terminal, &state_graph)?;
+    }
+
+    cleanup_terminal()?;
+
+    println!("{}", get_graph_info(&state_graph));
+    Ok(())
+}
 
 fn run_interactive(game_state: GameState, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut game_state = game_state;
@@ -90,5 +110,7 @@ fn run_interactive(game_state: GameState, terminal: &mut Terminal<CrosstermBacke
             }
         }
     }
+
+    cleanup_terminal()?;
     Ok(())
 }

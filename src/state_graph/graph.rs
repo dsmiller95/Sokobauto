@@ -11,7 +11,7 @@ impl StateGraph {
         }
     }
 
-    pub fn get_id(&mut self, state: GameState) -> usize {
+    pub fn upsert_state(&mut self, state: GameState) -> usize {
         if let Some(&id) = self.nodes.get_by_left(&state) {
             id
         } else {

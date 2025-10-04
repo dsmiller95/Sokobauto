@@ -11,7 +11,7 @@ pub fn populate_node(graph: &mut StateGraph, from_id: usize) {
     for action in actions {
         let update = step(&from_state, action.clone());
         if let GameUpdate::NextState(new_state) = update {
-            let to_id = graph.get_id(new_state);
+            let to_id = graph.upsert_state(new_state);
             graph.add_edge(from_id, to_id, action);
         }
     }
