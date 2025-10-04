@@ -1,30 +1,9 @@
-#[derive(Clone, Copy, PartialEq)]
-pub enum Cell {
-    Wall,
-    Floor,
-    Target,
-    BoxOnFloor,
-    BoxOnTarget,
-    PlayerOnFloor,
-    PlayerOnTarget,
-}
 
-#[derive(Clone, Copy)]
-pub struct Vec2 {
-    pub i: i32,
-    pub j: i32,
-}
+pub(crate) use crate::core::{Cell, Vec2};
+use crate::core::GameState;
 
-#[derive(Clone, Copy)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
-#[derive(Clone, Copy)]
-pub enum UserAction {
-    Move(Direction),
-    Quit,
+pub struct GameRenderState { 
+    pub game: GameState,
+    pub won: bool,
+    pub error: Option<String>,
 }

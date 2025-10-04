@@ -7,8 +7,8 @@ mod core;
 mod models;
 
 use crate::console_interface::{cleanup_terminal, handle_input, parse_level, render_game, setup_terminal};
-use crate::core::{step, won};
-use crate::models::UserAction;
+use crate::core::{step, GameUpdate, UserAction};
+use crate::models::GameRenderState;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A tiny built-in level (Sokoban-like)
@@ -24,21 +24,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   #######
 "#;
 
-    let (mut grid, mut player) = parse_level(level);
+    let mut game_state = parse_level(level);
     let mut terminal = setup_terminal()?;
 
     // Initial render
-    render_game(&mut terminal, &grid, false)?;
+    let first_render = GameRenderState {
+        game: game_state.clone(),
+        won: false,
+        error: None,
+    };
+    render_game(&mut terminal, &first_render)?;
 
     loop {
         match handle_input() {
             Ok(Some(UserAction::Quit)) => break,
             Ok(Some(user_action)) => {
-                step(&mut grid, &mut player, user_action);
-                let game_won = won(&grid);
-                render_game(&mut terminal, &grid, game_won)?;
+                let game_update = step(&game_state, user_action);
+                if let GameUpdate::NextState(new_state) = &game_update {
+                    game_state = new_state.clone();
+                }
+                let to_render = GameRenderState{
+                    game: game_state.clone(),
+                    won: game_state.is_won(),
+                    error: match game_update {
+                        GameUpdate::Error(err) => Some(err),
+                        _ => None,
+                    },
+                };
+                render_game(&mut terminal, &to_render)?;
 
-                if game_won {
+                if to_render.won {
                     // Keep showing the win screen until user quits
                     loop {
                         if let Err(_) = handle_input() {

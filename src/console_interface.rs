@@ -7,12 +7,13 @@ use ratatui::{
     Terminal,
 };
 use std::io;
+use crate::core::{Direction, GameState, UserAction};
 use crate::models::Cell::{
     BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target, Wall,
 };
-use crate::models::{Cell, Direction, UserAction, Vec2};
+use crate::models::{Cell, GameRenderState, Vec2};
 
-pub fn parse_level(s: &str) -> (Vec<Vec<Cell>>, Vec2) {
+pub fn parse_level(s: &str) -> GameState {
     let mut grid: Vec<Vec<Cell>> = Vec::new();
     let mut player = Vec2 { i: 0, j: 0 };
     let max_width = s.lines().map(|line| line.len()).max().unwrap_or(0);
@@ -50,7 +51,10 @@ pub fn parse_level(s: &str) -> (Vec<Vec<Cell>>, Vec2) {
         grid.push(row);
     }
 
-    (grid, player)
+    GameState {
+        grid,
+        player,
+    }
 }
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn std::error::Error>> {
@@ -69,8 +73,7 @@ pub fn cleanup_terminal() -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn render_game(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    grid: &[Vec<Cell>],
-    won: bool,
+    state: &GameRenderState
 ) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|f| {
         let chunks = Layout::default()
@@ -79,7 +82,7 @@ pub fn render_game(
             .split(f.area());
 
         // Game area
-        let game_text = render_grid_to_string(grid);
+        let game_text = render_grid_to_string(&state.game.grid);
         let game_paragraph = Paragraph::new(game_text)
             .block(Block::default().borders(Borders::ALL).title("Sokoban"))
             .style(Style::default().fg(Color::White))
@@ -87,10 +90,16 @@ pub fn render_game(
         f.render_widget(game_paragraph, chunks[0]);
 
         // Instructions
-        let instructions = if won {
+        let instructions = if state.won {
             "🎉 You Win! Press Q to quit."
         } else {
             "Controls: WASD or Arrow keys to move, Q to quit"
+        };
+
+        let instructions = if let Some(err) = &state.error {
+            format!("{} | Error: {}", instructions, err)
+        } else {
+            instructions.to_string()
         };
 
         let instruction_paragraph = Paragraph::new(instructions)
@@ -102,7 +111,7 @@ pub fn render_game(
     Ok(())
 }
 
-fn render_grid_to_string(grid: &[Vec<Cell>]) -> String {
+fn render_grid_to_string(grid: &Vec<Vec<Cell>>) -> String {
     let mut result = String::new();
     for row in grid {
         for c in row {

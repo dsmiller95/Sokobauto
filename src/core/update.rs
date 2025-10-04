@@ -1,80 +1,69 @@
-use crate::models::Cell::{BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target};
-use crate::models::{Cell, Direction, UserAction, Vec2};
+use crate::core::Cell::{BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target};
+use crate::core::{Direction, GameState, GameUpdate, UserAction, Vec2};
 
-pub fn won(grid: &[Vec<Cell>]) -> bool {
-    for row in grid {
-        for c in row {
-            if *c == Target || *c == PlayerOnTarget {
-                // if any bare target remains, not yet solved
-                return false;
-            }
-        }
-    }
-    true
-}
+pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
 
-pub fn step(grid: &mut [Vec<Cell>], player: &mut Vec2, action: UserAction) {
-    let h = grid.len() as i32;
-    let w = grid[0].len() as i32;
+    let h = game.height();
+    let w = game.width();
 
     let dir = match action {
-        UserAction::Quit => return,
+        UserAction::Quit => return GameUpdate::NoChange,
         UserAction::Move(d) => vec_from_dir(d),
     };
 
-    let ni = player.i + dir.i;
-    let nj = player.j + dir.j;
+    let ni = game.player.i + dir.i;
+    let nj = game.player.j + dir.j;
     if ni < 0 || nj < 0 || ni >= h || nj >= w {
-        println!("Out of range 0? width: {}, height: {}", w, h);
-        return;
+        return GameUpdate::Error("Cannot move out of bounds".to_string());
     }
 
-    let dest = grid[ni as usize][nj as usize];
+    let dest = game.grid[ni as usize][nj as usize];
     let pushing = dest == BoxOnFloor || dest == BoxOnTarget;
+
+    let mut new_grid = game.grid.clone();
 
     if pushing {
         let bi = ni + dir.i;
         let bj = nj + dir.j;
         if bi < 0 || bj < 0 || bi >= h || bj >= w {
-            println!("Out of range 1?");
-            return;
+            return GameUpdate::Error("Cannot push block out of bounds".to_string());
         }
-        let beyond = grid[bi as usize][bj as usize];
+        let beyond = new_grid[bi as usize][bj as usize];
         if !(beyond == Floor || beyond == Target) {
-            println!("Out of range 2?");
-            return;
+            return GameUpdate::Error("Cannot push block".to_string());
         }
 
         // Move box
-        grid[bi as usize][bj as usize] = if beyond == Target {
+        new_grid[bi as usize][bj as usize] = if beyond == Target {
             BoxOnTarget
         } else {
             BoxOnFloor
         };
 
         // Clear old box spot (player will step into it)
-        grid[ni as usize][nj as usize] = if dest == BoxOnTarget { Target } else { Floor };
+        new_grid[ni as usize][nj as usize] = if dest == BoxOnTarget { Target } else { Floor };
     } else {
         if !(dest == Floor || dest == Target) {
-            println!("Out of range 3?");
-            return;
+            return GameUpdate::Error("Cannot walk into a wall".to_string());
         }
     }
 
     // Move player
-    let (pi, pj) = (player.i, player.j);
-    let cur = grid[pi as usize][pj as usize];
-    grid[pi as usize][pj as usize] = if cur == PlayerOnTarget { Target } else { Floor };
+    let (pi, pj) = (game.player.i, game.player.j);
+    let cur = new_grid[pi as usize][pj as usize];
+    new_grid[pi as usize][pj as usize] = if cur == PlayerOnTarget { Target } else { Floor };
 
-    let dest_now = grid[ni as usize][nj as usize];
-    grid[ni as usize][nj as usize] = if dest_now == Target {
+    let dest_now = new_grid[ni as usize][nj as usize];
+    new_grid[ni as usize][nj as usize] = if dest_now == Target {
         PlayerOnTarget
     } else {
         PlayerOnFloor
     };
 
-    player.i = ni;
-    player.j = nj;
+    GameUpdate::NextState(GameState {
+        grid: new_grid,
+        player: Vec2 { i: ni, j: nj },
+    })
 }
 
 
