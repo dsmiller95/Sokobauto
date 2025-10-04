@@ -8,6 +8,7 @@ impl StateGraph {
             nodes: bimap::BiMap::new(),
             metadata: HashMap::new(),
             edges: HashSet::new(),
+            unvisited: HashSet::new(),
         }
     }
 
@@ -18,6 +19,7 @@ impl StateGraph {
             let id = self.nodes.len();
             self.nodes.insert(state, id);
             self.metadata.insert(id, NodeMeta::default());
+            self.unvisited.insert(id);
             id
         }
     }
@@ -34,18 +36,26 @@ impl StateGraph {
         if let Some(meta) = self.metadata.get_mut(&node_id) {
             meta.state = NodeState::Visited;
         }
+        self.unvisited.remove(&node_id);
     }
 
     pub fn get_unvisited_node(&self) -> Option<usize> {
-        self.metadata
+        self.unvisited.iter().next().map(|id| *id)
+    }
+
+    pub fn assert_all_visited(&self) {
+        let unvisited_meta = self.metadata
             .iter()
-            .filter_map(|(&id, meta)| {
+            .filter(|(_, meta)| {
                 if meta.state == NodeState::Unvisited {
-                    Some(id)
+                    true
                 } else {
-                    None
+                    false
                 }
             })
-            .next()
+            .count();
+
+        assert!(self.unvisited.is_empty());
+        assert_eq!(unvisited_meta, 0);
     }
 }

@@ -30,6 +30,7 @@ pub fn populate_step(graph: &mut StateGraph) -> PopulateResult {
     let picked_node = graph.get_unvisited_node();
 
     let Some(node_id) = picked_node else {
+        graph.assert_all_visited();
         return PopulateResult::AllVisited;
     };
     populate_node(graph, node_id);

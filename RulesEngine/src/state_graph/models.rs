@@ -6,6 +6,7 @@ pub struct StateGraph {
     pub nodes: bimap::BiMap<GameState, usize>,
     pub metadata: HashMap<usize, NodeMeta>,
     pub edges: HashSet<Edge>,
+    pub unvisited: HashSet<usize>,
 }
 
 #[derive(Default, Clone)]
