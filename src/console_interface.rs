@@ -1,5 +1,12 @@
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction as LayoutDirection, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
 use std::io;
-use std::io::Read;
 use crate::models::Cell::{
     BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target, Wall,
 };
@@ -46,9 +53,57 @@ pub fn parse_level(s: &str) -> (Vec<Vec<Cell>>, Vec2) {
     (grid, player)
 }
 
-pub fn render(grid: &[Vec<Cell>]) {
-    // Clear screen and move cursor to home (ANSI)
-    // print!("\x1b[2J\x1b[H");
+pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn std::error::Error>> {
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(io::stdout());
+    let terminal = Terminal::new(backend)?;
+    Ok(terminal)
+}
+
+pub fn cleanup_terminal() -> Result<(), Box<dyn std::error::Error>> {
+    crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(io::stdout(), crossterm::terminal::LeaveAlternateScreen)?;
+    Ok(())
+}
+
+pub fn render_game(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    grid: &[Vec<Cell>],
+    won: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    terminal.draw(|f| {
+        let chunks = Layout::default()
+            .direction(LayoutDirection::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(3)])
+            .split(f.area());
+
+        // Game area
+        let game_text = render_grid_to_string(grid);
+        let game_paragraph = Paragraph::new(game_text)
+            .block(Block::default().borders(Borders::ALL).title("Sokoban"))
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Center);
+        f.render_widget(game_paragraph, chunks[0]);
+
+        // Instructions
+        let instructions = if won {
+            "🎉 You Win! Press Q to quit."
+        } else {
+            "Controls: WASD or Arrow keys to move, Q to quit"
+        };
+
+        let instruction_paragraph = Paragraph::new(instructions)
+            .block(Block::default().borders(Borders::ALL).title("Instructions"))
+            .style(Style::default().fg(Color::Cyan))
+            .alignment(Alignment::Center);
+        f.render_widget(instruction_paragraph, chunks[1]);
+    })?;
+    Ok(())
+}
+
+fn render_grid_to_string(grid: &[Vec<Cell>]) -> String {
+    let mut result = String::new();
     for row in grid {
         for c in row {
             let ch = match c {
@@ -60,29 +115,40 @@ pub fn render(grid: &[Vec<Cell>]) {
                 PlayerOnFloor => '@',
                 PlayerOnTarget => '+',
             };
-            print!("{ch}");
+            result.push(ch);
         }
-        println!();
+        result.push('\n');
     }
-    println!("\nMove: WASD / arrows + Enter. Q to quit.");
+    result
 }
 
-
-pub fn dir_from_input(byte: u8) -> Option<Direction> {
-    match byte {
-        b'w' | b'W' => Some(Direction::Up),
-        b's' | b'S' => Some(Direction::Down),
-        b'a' | b'A' => Some(Direction::Left),
-        b'd' | b'D' => Some(Direction::Right),
-        _ => None,
+pub fn handle_input() -> Result<Option<UserAction>, Box<dyn std::error::Error>> {
+    if event::poll(std::time::Duration::from_millis(50))? {
+        if let Event::Key(KeyEvent {
+            code,
+            kind: KeyEventKind::Press,
+            ..
+        }) = event::read()?
+        {
+            match code {
+                KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => {
+                    return Ok(Some(UserAction::Quit));
+                }
+                KeyCode::Char('w') | KeyCode::Char('W') | KeyCode::Up => {
+                    return Ok(Some(UserAction::Move(Direction::Up)));
+                }
+                KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Down => {
+                    return Ok(Some(UserAction::Move(Direction::Down)));
+                }
+                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Left => {
+                    return Ok(Some(UserAction::Move(Direction::Left)));
+                }
+                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Right => {
+                    return Ok(Some(UserAction::Move(Direction::Right)));
+                }
+                _ => {}
+            }
+        }
     }
-}
-
-pub fn input_from_console() -> Option<UserAction> {
-    io::stdin()
-        .bytes()
-        .next()
-        .and_then(|result| result.ok())
-        .and_then(dir_from_input)
-        .map(|dir| UserAction{ dir })
+    Ok(None)
 }

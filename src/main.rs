@@ -1,17 +1,16 @@
-// Simple CLI Sokoban (no dependencies)
-// Controls: W/A/S/D or arrow keys, then Enter. Q to quit.
+// Simple CLI Sokoban with ratatui
+// Controls: W/A/S/D or arrow keys (immediate response). Q to quit.
 // Tiles: '#' wall, '@' player, '$' box, '.' target, '*' box on target, '+' player on target, ' ' floor.
 
 mod console_interface;
 mod core;
 mod models;
 
-use std::io::{self, Read};
-
-use crate::console_interface::{input_from_console, parse_level, render};
+use crate::console_interface::{cleanup_terminal, handle_input, parse_level, render_game, setup_terminal};
 use crate::core::{step, won};
+use crate::models::UserAction;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A tiny built-in level (Sokoban-like)
     // You can add more and switch by index.
     let level = r#"
@@ -26,20 +25,39 @@ fn main() {
 "#;
 
     let (mut grid, mut player) = parse_level(level);
-    render(&grid);
+    let mut terminal = setup_terminal()?;
+
+    // Initial render
+    render_game(&mut terminal, &grid, false)?;
 
     loop {
-        // Read a line (allows both single chars like 'w' and arrow escape sequences).
-        if let Some(userAction) = input_from_console() {
-            step(&mut grid, &mut player, userAction);
-            render(&grid);
-            if won(&grid) {
-                println!("You win! 🎉");
+        match handle_input() {
+            Ok(Some(UserAction::Quit)) => break,
+            Ok(Some(user_action)) => {
+                step(&mut grid, &mut player, user_action);
+                let game_won = won(&grid);
+                render_game(&mut terminal, &grid, game_won)?;
+
+                if game_won {
+                    // Keep showing the win screen until user quits
+                    loop {
+                        if let Err(_) = handle_input() {
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            Ok(None) => {
+                // No input, continue polling
+            }
+            Err(_) => {
+                println!("error reading input");
                 break;
             }
-        } else {
-            // Ignore unknown input; re-render to keep the screen tidy
-            render(&grid);
         }
     }
+
+    cleanup_terminal()?;
+    Ok(())
 }

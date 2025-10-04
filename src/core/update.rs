@@ -17,7 +17,10 @@ pub fn step(grid: &mut [Vec<Cell>], player: &mut Vec2, action: UserAction) {
     let h = grid.len() as i32;
     let w = grid[0].len() as i32;
 
-    let dir = vec_from_dir(action.dir);
+    let dir = match action {
+        UserAction::Quit => return,
+        UserAction::Move(d) => vec_from_dir(d),
+    };
 
     let ni = player.i + dir.i;
     let nj = player.j + dir.j;

@@ -24,6 +24,7 @@ pub enum Direction {
 }
 
 #[derive(Clone, Copy)]
-pub struct UserAction {
-    pub dir: Direction,
+pub enum UserAction {
+    Move(Direction),
+    Quit,
 }
