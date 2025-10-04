@@ -91,7 +91,7 @@ pub fn render_game(
 
         // Instructions
         let instructions = if state.won {
-            "🎉 You Win! Press Q to quit."
+            "🎉 You Win! Press the any key to quit."
         } else {
             "Controls: WASD or Arrow keys to move, Q to quit"
         };

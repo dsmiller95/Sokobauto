@@ -1,4 +1,4 @@
-﻿#[derive(Clone, Copy, PartialEq)]
+﻿#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cell {
     Wall,
     Floor,
@@ -9,13 +9,13 @@ pub enum Cell {
     PlayerOnTarget,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Vec2 {
     pub i: i32,
     pub j: i32,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
     Up,
     Down,
@@ -23,13 +23,13 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UserAction {
     Move(Direction),
     Quit,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GameState {
     pub grid: Vec<Vec<Cell>>,
     pub player: Vec2,
