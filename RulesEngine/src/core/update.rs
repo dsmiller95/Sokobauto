@@ -1,4 +1,5 @@
-use crate::core::Cell::{BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target};
+use std::ops::IndexMut;
+use crate::core::Cell::{Floor, Target, Wall};
 use crate::core::{Direction, GameChangeType, GameState, GameUpdate, UserAction, Vec2};
 
 pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
@@ -9,61 +10,54 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
         UserAction::Move(d) => vec_from_dir(d),
     };
 
+
     let ni = game.player.i + dir.i;
     let nj = game.player.j + dir.j;
+    let dest_pos = Vec2{
+        i: ni,
+        j: nj,
+    };
     if ni < 0 || nj < 0 || ni >= h || nj >= w {
         return GameUpdate::Error("Cannot move out of bounds".to_string());
     }
 
     let dest = game.grid[ni as usize][nj as usize];
-    let pushing = dest == BoxOnFloor || dest == BoxOnTarget;
-
-    let mut new_grid = game.grid.clone();
-
-    if pushing {
+    
+    let pushing = game.boxes.iter().position(|&x| x == dest_pos);
+    let mut new_boxes = game.boxes.clone();
+    if let Some(pushed_box_index) = pushing {
         let bi = ni + dir.i;
         let bj = nj + dir.j;
+        let new_box_pos = Vec2{
+            i: bi,
+            j: bj,
+        };
         if bi < 0 || bj < 0 || bi >= h || bj >= w {
             return GameUpdate::Error("Cannot push block out of bounds".to_string());
         }
-        let beyond = new_grid[bi as usize][bj as usize];
-        if !(beyond == Floor || beyond == Target) {
-            return GameUpdate::Error("Cannot push block".to_string());
+        let beyond = game.grid[bi as usize][bj as usize];
+        if beyond == Wall {
+            return GameUpdate::Error("Cannot push block into wall".to_string());
+        }
+        if game.boxes.contains(&new_box_pos) {
+            return GameUpdate::Error("Cannot push block into another block".to_string());
         }
 
-        // Move box
-        new_grid[bi as usize][bj as usize] = if beyond == Target {
-            BoxOnTarget
-        } else {
-            BoxOnFloor
-        };
-
-        // Clear old box spot (player will step into it)
-        new_grid[ni as usize][nj as usize] = if dest == BoxOnTarget { Target } else { Floor };
+        new_boxes[pushed_box_index] = new_box_pos;
     } else {
         if !(dest == Floor || dest == Target) {
             return GameUpdate::Error("Cannot walk into a wall".to_string());
         }
     }
 
-    // Move player
-    let (pi, pj) = (game.player.i, game.player.j);
-    let cur = new_grid[pi as usize][pj as usize];
-    new_grid[pi as usize][pj as usize] = if cur == PlayerOnTarget { Target } else { Floor };
-
-    let dest_now = new_grid[ni as usize][nj as usize];
-    new_grid[ni as usize][nj as usize] = if dest_now == Target {
-        PlayerOnTarget
-    } else {
-        PlayerOnFloor
-    };
-
     GameUpdate::NextState(
         GameState {
-            grid: new_grid,
-            player: Vec2 { i: ni, j: nj },
+            // TODO: don't clone
+            grid: game.grid.clone(),
+            player: dest_pos,
+            boxes: new_boxes,
         },
-        if pushing {
+        if pushing.is_some() {
             GameChangeType::PlayerAndBoxMove
         } else {
             GameChangeType::PlayerMove

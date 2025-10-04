@@ -1,6 +1,6 @@
 use crate::core::{Direction, GameState, UserAction};
 use crate::models::Cell::{
-    BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target, Wall,
+    Floor, Target, Wall,
 };
 use crate::models::{Cell, GameRenderState, Vec2};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -16,6 +16,7 @@ use std::io;
 pub fn parse_level(s: &str) -> GameState {
     let mut grid: Vec<Vec<Cell>> = Vec::new();
     let mut player = Vec2 { i: 0, j: 0 };
+    let mut boxes: Vec<Vec2> = Vec::new();
     let max_width = s.lines().map(|line| line.len()).max().unwrap_or(0);
     for (i, line) in s.lines().enumerate() {
         let mut row = Vec::new();
@@ -24,21 +25,33 @@ pub fn parse_level(s: &str) -> GameState {
                 '#' => Wall,
                 ' ' => Floor,
                 '.' => Target,
-                '$' => BoxOnFloor,
-                '*' => BoxOnTarget,
+                '$' => {
+                    boxes.push(Vec2 {
+                        i: i as i32,
+                        j: j as i32,
+                    });
+                    Floor
+                },
+                '*' => {
+                    boxes.push(Vec2 {
+                        i: i as i32,
+                        j: j as i32,
+                    });
+                    Target
+                },
                 '@' => {
                     player = Vec2 {
                         i: i as i32,
                         j: j as i32,
                     };
-                    PlayerOnFloor
+                    Floor
                 }
                 '+' => {
                     player = Vec2 {
                         i: i as i32,
                         j: j as i32,
                     };
-                    PlayerOnTarget
+                    Target
                 }
                 _ => Floor,
             };
@@ -51,7 +64,11 @@ pub fn parse_level(s: &str) -> GameState {
         grid.push(row);
     }
 
-    GameState { grid, player }
+    GameState {
+        grid,
+        player,
+        boxes
+    }
 }
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn std::error::Error>>
@@ -80,7 +97,7 @@ pub fn render_game(
             .split(f.area());
 
         // Game area
-        let game_text = render_grid_to_string(&state.game.grid);
+        let game_text = render_grid_to_string(&state.game);
         let game_paragraph = Paragraph::new(game_text)
             .block(Block::default().borders(Borders::ALL).title("Sokoban"))
             .style(Style::default().fg(Color::White))
@@ -115,18 +132,20 @@ pub fn render_game(
     Ok(())
 }
 
-fn render_grid_to_string(grid: &Vec<Vec<Cell>>) -> String {
+fn render_grid_to_string(game: &GameState) -> String {
     let mut result = String::new();
-    for row in grid {
-        for c in row {
+    for (i, row) in game.grid.iter().enumerate() {
+        for (j, c) in row.iter().enumerate() {
+            let pos = Vec2 {
+                i: i as i32,
+                j: j as i32,
+            };
+            let has_player = pos == game.player;
+            let has_box = game.boxes.contains(&pos);
             let ch = match c {
                 Wall => '#',
-                Floor => ' ',
-                Target => '.',
-                BoxOnFloor => '$',
-                BoxOnTarget => '*',
-                PlayerOnFloor => '@',
-                PlayerOnTarget => '+',
+                Floor => if has_player { '@' } else { if has_box { '$' } else { ' ' } },
+                Target => if has_player { '+' } else { if has_box { '*' } else { '.' } },
             };
             result.push(ch);
         }

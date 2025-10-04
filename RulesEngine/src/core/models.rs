@@ -3,10 +3,6 @@ pub enum Cell {
     Wall,
     Floor,
     Target,
-    BoxOnFloor,
-    BoxOnTarget,
-    PlayerOnFloor,
-    PlayerOnTarget,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -31,6 +27,7 @@ pub enum UserAction {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GameState {
     pub grid: Vec<Vec<Cell>>,
+    pub boxes: Vec<Vec2>,
     pub player: Vec2,
 }
 

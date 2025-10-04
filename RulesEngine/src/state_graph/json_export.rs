@@ -61,12 +61,7 @@ pub fn get_json_data(graph: &StateGraph) -> String {
         .nodes
         .iter()
         .map(|(state, id)| {
-            let on_targets = state
-                .grid
-                .iter()
-                .flatten()
-                .filter(|&&c| c == Cell::BoxOnTarget)
-                .count();
+            let on_targets = state.count_boxes_on_goals();
             JsonNode {
                 id: *id,
                 on_targets,
