@@ -17,6 +17,7 @@ use crate::state_graph::{PopulateResult, StateGraph, get_graph_info, get_json_da
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use std::io;
+use std::io::Write;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let switch = std::env::args().nth(1).unwrap_or("interactive".to_string());
@@ -31,6 +32,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #  $$   ##  ..#
 #          ####
 ############
+"#;
+    let level = r#"
+########
+#  @ $ #
+# .    #
+########
 "#;
 
     let game_state = parse_level(level);
@@ -101,8 +108,12 @@ fn run_state_graph(
     println!("{}", get_graph_info(&state_graph));
 
     let json_data = get_json_data(&state_graph);
-    std::fs::create_dir("exports")?;
-    std::fs::write("exports/state_graph.json", json_data)?;
+    std::fs::create_dir_all("exports")?;
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("exports/state_graph.json")?;
+    f.write_all(json_data.as_bytes())?;
     println!("State graph exported to exports/state_graph.json");
 
     render_interactive_graph(&state_graph);

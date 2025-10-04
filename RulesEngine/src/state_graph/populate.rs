@@ -23,22 +23,11 @@ pub fn populate_node(graph: &mut StateGraph, from_id: usize) {
         }
     }
 
-    let meta = graph.get_node_meta_mut(from_id);
-    meta.state = NodeState::Visited;
+    graph.mark_visited(from_id);
 }
 
 pub fn populate_step(graph: &mut StateGraph) -> PopulateResult {
-    let picked_node = graph
-        .metadata
-        .iter()
-        .filter_map(|(&id, meta)| {
-            if meta.state == NodeState::Unvisited {
-                Some(id)
-            } else {
-                None
-            }
-        })
-        .next();
+    let picked_node = graph.get_unvisited_node();
 
     let Some(node_id) = picked_node else {
         return PopulateResult::AllVisited;

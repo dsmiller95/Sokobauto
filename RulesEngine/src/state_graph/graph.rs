@@ -1,5 +1,5 @@
 use crate::core::{GameState};
-use crate::state_graph::models::{Edge, NodeMeta, StateGraph};
+use crate::state_graph::models::{Edge, NodeMeta, NodeState, StateGraph};
 use std::collections::{HashMap, HashSet};
 
 impl StateGraph {
@@ -30,9 +30,22 @@ impl StateGraph {
         self.edges.insert(edge);
     }
 
-    pub fn get_node_meta_mut(&mut self, node_id: usize) -> &mut NodeMeta {
+    pub fn mark_visited(&mut self, node_id: usize) {
+        if let Some(meta) = self.metadata.get_mut(&node_id) {
+            meta.state = NodeState::Visited;
+        }
+    }
+
+    pub fn get_unvisited_node(&self) -> Option<usize> {
         self.metadata
-            .entry(node_id)
-            .or_insert_with(NodeMeta::default)
+            .iter()
+            .filter_map(|(&id, meta)| {
+                if meta.state == NodeState::Unvisited {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 }
