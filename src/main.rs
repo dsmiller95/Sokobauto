@@ -19,14 +19,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A tiny built-in level (Sokoban-like)
     // You can add more and switch by index.
     let level = r#"
-  #######
-  #  .  #
-  #  $  #
-### $# ###
-#   @   #
-###   ###
-  #  .  #
-  #######
+#######
+#. $ @#
+#######
 "#;
 
     let game_state = parse_level(level);
