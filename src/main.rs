@@ -13,7 +13,7 @@ use ratatui::Terminal;
 use crate::console_interface::{cleanup_terminal, handle_input, parse_level, render_game, setup_terminal};
 use crate::core::{step, GameState, GameUpdate, UserAction};
 use crate::models::GameRenderState;
-use crate::state_graph::{get_graph_info, populate_step, render_graph, PopulateResult, StateGraph};
+use crate::state_graph::{get_graph_info, populate_step, render_graph, render_interactive_graph, PopulateResult, StateGraph};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A tiny built-in level (Sokoban-like)
@@ -50,6 +50,8 @@ fn run_state_graph(game_state: GameState, terminal: &mut Terminal<CrosstermBacke
     cleanup_terminal()?;
 
     println!("{}", get_graph_info(&state_graph));
+    
+    render_interactive_graph(&state_graph);
     Ok(())
 }
 
