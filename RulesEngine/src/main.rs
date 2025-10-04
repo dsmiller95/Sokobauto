@@ -79,6 +79,7 @@ fn run_state_graph(
     println!("{}", get_graph_info(&state_graph));
 
     let json_data = get_json_data(&state_graph);
+    std::fs::create_dir("exports")?;
     std::fs::write("exports/state_graph.json", json_data)?;
     println!("State graph exported to exports/state_graph.json");
 
