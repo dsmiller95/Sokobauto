@@ -1,6 +1,5 @@
 use crate::core::{Cell, UserAction};
 use crate::state_graph::StateGraph;
-use petgraph::Directed;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -1,4 +1,4 @@
-use crate::core::{GameState, GameUpdate, UserAction, step};
+use crate::core::{GameUpdate, UserAction, step};
 use crate::state_graph::Edge;
 use crate::state_graph::models::{NodeState, PopulateResult, StateGraph};
 
@@ -45,5 +45,5 @@ pub fn populate_step(graph: &mut StateGraph) -> PopulateResult {
         return PopulateResult::AllVisited;
     };
     populate_node(graph, node_id);
-    PopulateResult::Populated(node_id)
+    PopulateResult::Populated
 }

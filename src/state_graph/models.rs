@@ -30,5 +30,5 @@ pub struct Edge {
 
 pub enum PopulateResult {
     AllVisited,
-    Populated(usize),
+    Populated,
 }

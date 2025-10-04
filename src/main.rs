@@ -67,7 +67,7 @@ fn run_state_graph(
     'outer: loop {
         let stop_time = std::time::Instant::now() + std::time::Duration::from_millis(100);
         while std::time::Instant::now() < stop_time {
-            let PopulateResult::Populated(_) = populate_step(&mut state_graph) else {
+            let PopulateResult::Populated = populate_step(&mut state_graph) else {
                 break 'outer;
             };
         }

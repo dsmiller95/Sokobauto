@@ -8,5 +8,5 @@ mod populate;
 pub use console_interface::{get_graph_info, render_graph};
 pub use fdg_interface::render_interactive_graph;
 pub use json_export::get_json_data;
-pub use models::{Edge, NodeMeta, PopulateResult, StateGraph};
-pub use populate::{populate_node, populate_step};
+pub use models::{Edge, PopulateResult, StateGraph};
+pub use populate::{populate_step};
