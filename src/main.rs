@@ -8,7 +8,7 @@ mod models;
 
 use std::io::{self, Read};
 
-use crate::console_interface::{dir_from_input, parse_level, render};
+use crate::console_interface::{input_from_console, parse_level, render};
 use crate::core::{step, won};
 
 fn main() {
@@ -30,23 +30,8 @@ fn main() {
 
     loop {
         // Read a line (allows both single chars like 'w' and arrow escape sequences).
-        let mut buf = [0u8; 8];
-        let mut input = io::stdin().lock();
-        let n = match input.read(&mut buf) {
-            Ok(n) => n,
-            Err(_) => 0,
-        };
-        if n == 0 {
-            break;
-        }
-        // Quit on 'q' or EOF after showing win/lose status
-        if buf[0] == b'q' || buf[0] == b'Q' {
-            println!("Bye!");
-            break;
-        }
-
-        if let Some(d) = dir_from_input(&buf[..n]) {
-            step(&mut grid, &mut player, d);
+        if let Some(userAction) = input_from_console() {
+            step(&mut grid, &mut player, userAction);
             render(&grid);
             if won(&grid) {
                 println!("You win! 🎉");

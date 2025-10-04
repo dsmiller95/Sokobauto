@@ -1,5 +1,5 @@
 use crate::models::Cell::{BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target};
-use crate::models::{Cell, Vec2};
+use crate::models::{Cell, Direction, UserAction, Vec2};
 
 pub fn won(grid: &[Vec<Cell>]) -> bool {
     for row in grid {
@@ -13,9 +13,11 @@ pub fn won(grid: &[Vec<Cell>]) -> bool {
     true
 }
 
-pub fn step(grid: &mut [Vec<Cell>], player: &mut Vec2, dir: Vec2) {
+pub fn step(grid: &mut [Vec<Cell>], player: &mut Vec2, action: UserAction) {
     let h = grid.len() as i32;
     let w = grid[0].len() as i32;
+
+    let dir = vec_from_dir(action.dir);
 
     let ni = player.i + dir.i;
     let nj = player.j + dir.j;
@@ -70,4 +72,14 @@ pub fn step(grid: &mut [Vec<Cell>], player: &mut Vec2, dir: Vec2) {
 
     player.i = ni;
     player.j = nj;
+}
+
+
+fn vec_from_dir(dir: Direction) -> Vec2 {
+    match dir {
+        Direction::Up => Vec2 { i: -1, j: 0 },
+        Direction::Down => Vec2 { i: 1, j: 0 },
+        Direction::Left => Vec2 { i: 0, j: -1 },
+        Direction::Right => Vec2 { i: 0, j: 1 },
+    }
 }

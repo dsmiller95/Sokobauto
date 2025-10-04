@@ -1,7 +1,9 @@
+use std::io;
+use std::io::Read;
 use crate::models::Cell::{
     BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target, Wall,
 };
-use crate::models::{Cell, Vec2};
+use crate::models::{Cell, Direction, UserAction, Vec2};
 
 pub fn parse_level(s: &str) -> (Vec<Vec<Cell>>, Vec2) {
     let mut grid: Vec<Vec<Cell>> = Vec::new();
@@ -65,32 +67,22 @@ pub fn render(grid: &[Vec<Cell>]) {
     println!("\nMove: WASD / arrows + Enter. Q to quit.");
 }
 
-pub fn dir_from_input(bytes: &[u8]) -> Option<Vec2> {
-    // Accept first meaningful byte/sequence: arrows start with 0x1B '[' 'A/B/C/D'
-    // Also support WASD/wads.
-    if bytes.is_empty() {
-        return None;
-    }
-    match bytes[0] {
-        b'w' | b'W' => Some(Vec2 { i: -1, j: 0 }),
-        b's' | b'S' => Some(Vec2 { i: 1, j: 0 }),
-        b'a' | b'A' => Some(Vec2 { i: 0, j: -1 }),
-        b'd' | b'D' => Some(Vec2 { i: 0, j: 1 }),
-        0x1B => {
-            // arrow sequence
-            if bytes.len() >= 3 && bytes[1] == b'[' {
-                match bytes[2] {
-                    b'A' => Some(Vec2 { i: -1, j: 0 }), // up
-                    b'B' => Some(Vec2 { i: 1, j: 0 }),  // down
-                    b'D' => Some(Vec2 { i: 0, j: -1 }), // left
-                    b'C' => Some(Vec2 { i: 0, j: 1 }),  // right
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        }
-        b'q' | b'Q' => None,
+
+pub fn dir_from_input(byte: u8) -> Option<Direction> {
+    match byte {
+        b'w' | b'W' => Some(Direction::Up),
+        b's' | b'S' => Some(Direction::Down),
+        b'a' | b'A' => Some(Direction::Left),
+        b'd' | b'D' => Some(Direction::Right),
         _ => None,
     }
+}
+
+pub fn input_from_console() -> Option<UserAction> {
+    io::stdin()
+        .bytes()
+        .next()
+        .and_then(|result| result.ok())
+        .and_then(dir_from_input)
+        .map(|dir| UserAction{ dir })
 }
