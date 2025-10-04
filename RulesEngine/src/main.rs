@@ -13,10 +13,7 @@ use crate::console_interface::{
 };
 use crate::core::{GameState, GameUpdate, step};
 use crate::models::GameRenderState;
-use crate::state_graph::{
-    PopulateResult, StateGraph, get_graph_info, get_json_data, populate_step, render_graph,
-    render_interactive_graph,
-};
+use crate::state_graph::{PopulateResult, StateGraph, get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, GraphRenderState};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use std::io;
@@ -27,11 +24,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A tiny built-in level (Sokoban-like)
     // You can add more and switch by index.
     let level = r#"
-#######
-#.    #
-#  #$ #
-#  # @#
-#######
+        ####
+#########  ##
+#           ###
+#  @$$ ##   ..#
+#  $$   ##  ..#
+#          ####
+############
 "#;
 
     let game_state = parse_level(level);
@@ -62,7 +61,18 @@ fn run_state_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut state_graph = StateGraph::new();
     state_graph.upsert_state(game_state);
-    render_graph(terminal, &state_graph)?;
+
+    let start_time = std::time::Instant::now();
+    let mut last_render_time = start_time;
+    let mut processed_since_last_render = 0;
+
+    render_graph(terminal, GraphRenderState {
+        graph: &state_graph,
+        processed_since_last_render,
+        start_time,
+        last_render_time,
+        current_time: last_render_time,
+    })?;
 
     'outer: loop {
         let stop_time = std::time::Instant::now() + std::time::Duration::from_millis(100);
@@ -70,8 +80,20 @@ fn run_state_graph(
             let PopulateResult::Populated = populate_step(&mut state_graph) else {
                 break 'outer;
             };
+            processed_since_last_render += 1;
         }
-        render_graph(terminal, &state_graph)?;
+
+        let current_time = std::time::Instant::now();
+        render_graph(terminal, GraphRenderState {
+            graph: &state_graph,
+            processed_since_last_render,
+            start_time,
+            last_render_time,
+            current_time,
+        })?;
+
+        last_render_time = current_time;
+        processed_since_last_render = 0;
     }
 
     cleanup_terminal()?;

@@ -28,7 +28,7 @@ pub fn populate_node(graph: &mut StateGraph, from_id: usize) {
 }
 
 pub fn populate_step(graph: &mut StateGraph) -> PopulateResult {
-    let unvisited_nodes: Vec<usize> = graph
+    let picked_node = graph
         .metadata
         .iter()
         .filter_map(|(&id, meta)| {
@@ -38,9 +38,8 @@ pub fn populate_step(graph: &mut StateGraph) -> PopulateResult {
                 None
             }
         })
-        .collect();
+        .next();
 
-    let picked_node = unvisited_nodes.first().cloned();
     let Some(node_id) = picked_node else {
         return PopulateResult::AllVisited;
     };
