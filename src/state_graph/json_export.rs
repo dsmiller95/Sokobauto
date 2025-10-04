@@ -1,7 +1,7 @@
-﻿use petgraph::Directed;
-use crate::state_graph::StateGraph;
-use serde::{Deserialize, Serialize};
 use crate::core::{Cell, UserAction};
+use crate::state_graph::StateGraph;
+use petgraph::Directed;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct JsonData {
@@ -58,23 +58,36 @@ impl From<crate::core::GameChangeType> for JsonEdgeType {
 }
 
 pub fn get_json_data(graph: &StateGraph) -> String {
-    let nodes: Vec<JsonNode> = graph.nodes.iter().map(|(state, id)| {
-        let on_targets = state.grid.iter()
-            .flatten()
-            .filter(|&&c| c == Cell::BoxOnTarget)
-            .count();
-        JsonNode { id: *id, on_targets }
-    }).collect();
+    let nodes: Vec<JsonNode> = graph
+        .nodes
+        .iter()
+        .map(|(state, id)| {
+            let on_targets = state
+                .grid
+                .iter()
+                .flatten()
+                .filter(|&&c| c == Cell::BoxOnTarget)
+                .count();
+            JsonNode {
+                id: *id,
+                on_targets,
+            }
+        })
+        .collect();
 
-    let edges: Vec<JsonEdge> = graph.edges.iter().map(|edge| {
-        let UserAction::Move(direction) = edge.action;
-        JsonEdge {
-            source: edge.from,
-            target: edge.to,
-            dir: direction.into(),
-            change_type: edge.game_change_type.into(),
-        }
-    }).collect();
+    let edges: Vec<JsonEdge> = graph
+        .edges
+        .iter()
+        .map(|edge| {
+            let UserAction::Move(direction) = edge.action;
+            JsonEdge {
+                source: edge.from,
+                target: edge.to,
+                dir: direction.into(),
+                change_type: edge.game_change_type.into(),
+            }
+        })
+        .collect();
 
     let json_data = JsonData { nodes, edges };
     serde_json::to_string_pretty(&json_data).unwrap()

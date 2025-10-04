@@ -7,14 +7,19 @@ mod core;
 mod models;
 mod state_graph;
 
-use std::io;
-use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
-use crate::console_interface::{cleanup_terminal, handle_input, parse_level, render_game, setup_terminal};
 use crate::console_interface::ConsoleInput::*;
-use crate::core::{step, GameState, GameUpdate};
+use crate::console_interface::{
+    cleanup_terminal, handle_input, parse_level, render_game, setup_terminal,
+};
+use crate::core::{GameState, GameUpdate, step};
 use crate::models::GameRenderState;
-use crate::state_graph::{get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, PopulateResult, StateGraph};
+use crate::state_graph::{
+    PopulateResult, StateGraph, get_graph_info, get_json_data, populate_step, render_graph,
+    render_interactive_graph,
+};
+use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
+use std::io;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let switch = std::env::args().nth(1).unwrap_or("interactive".to_string());
@@ -40,7 +45,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             run_interactive(game_state, &mut terminal)?;
         }
         _ => {
-            println!("Unknown mode: {}. Use 'interactive' or 'graph'. defaulting to interactive", switch);
+            println!(
+                "Unknown mode: {}. Use 'interactive' or 'graph'. defaulting to interactive",
+                switch
+            );
             run_interactive(game_state, &mut terminal)?;
         }
     }
@@ -48,7 +56,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_state_graph(game_state: GameState, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(), Box<dyn std::error::Error>> {
+fn run_state_graph(
+    game_state: GameState,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut state_graph = StateGraph::new();
     state_graph.upsert_state(game_state);
     render_graph(terminal, &state_graph)?;
@@ -75,7 +86,10 @@ fn run_state_graph(game_state: GameState, terminal: &mut Terminal<CrosstermBacke
     Ok(())
 }
 
-fn run_interactive(game_state: GameState, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(), Box<dyn std::error::Error>> {
+fn run_interactive(
+    game_state: GameState,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut game_state = game_state;
     // Initial render
     let first_render = GameRenderState {

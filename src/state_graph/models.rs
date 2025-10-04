@@ -1,5 +1,5 @@
-﻿use std::collections::{HashMap, HashSet};
 use crate::core::{GameChangeType, GameState, UserAction};
+use std::collections::{HashMap, HashSet};
 
 pub struct StateGraph {
     // map from game state to node id

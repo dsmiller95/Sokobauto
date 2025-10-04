@@ -1,4 +1,4 @@
-﻿#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cell {
     Wall,
     Floor,
@@ -34,7 +34,7 @@ pub struct GameState {
     pub player: Vec2,
 }
 
-pub enum GameUpdate{
+pub enum GameUpdate {
     NextState(GameState, GameChangeType),
     Error(String),
 }

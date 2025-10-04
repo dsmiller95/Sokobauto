@@ -1,17 +1,17 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction as LayoutDirection, Layout},
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
-    Terminal,
-};
-use std::io;
 use crate::core::{Direction, GameState, UserAction};
 use crate::models::Cell::{
     BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target, Wall,
 };
 use crate::models::{Cell, GameRenderState, Vec2};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::{
+    Terminal,
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction as LayoutDirection, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+};
+use std::io;
 
 pub fn parse_level(s: &str) -> GameState {
     let mut grid: Vec<Vec<Cell>> = Vec::new();
@@ -51,13 +51,11 @@ pub fn parse_level(s: &str) -> GameState {
         grid.push(row);
     }
 
-    GameState {
-        grid,
-        player,
-    }
+    GameState { grid, player }
 }
 
-pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn std::error::Error>> {
+pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn std::error::Error>>
+{
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(io::stdout());
@@ -73,7 +71,7 @@ pub fn cleanup_terminal() -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn render_game(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    state: &GameRenderState
+    state: &GameRenderState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|f| {
         let chunks = Layout::default()
@@ -101,7 +99,7 @@ pub fn render_game(
         } else {
             instructions.to_string()
         };
-        
+
         let instructions = if let Some(change_type) = &state.last_change {
             format!("{} | Last: {:?}", instructions, change_type)
         } else {
@@ -153,18 +151,21 @@ pub fn handle_input() -> Result<ConsoleInput, Box<dyn std::error::Error>> {
         }) = event::read()?
         {
             return Ok(match code {
-                KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc =>
-                    ConsoleInput::Quit,
-                KeyCode::Char('w') | KeyCode::Char('W') | KeyCode::Up =>
-                    ConsoleInput::UserAction(UserAction::Move(Direction::Up)),
-                KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Down =>
-                    ConsoleInput::UserAction(UserAction::Move(Direction::Down)),
-                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Left =>
-                    ConsoleInput::UserAction(UserAction::Move(Direction::Left)),
-                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Right =>
-                    ConsoleInput::UserAction(UserAction::Move(Direction::Right)),
-                _ => ConsoleInput::Unknown
-            })
+                KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => ConsoleInput::Quit,
+                KeyCode::Char('w') | KeyCode::Char('W') | KeyCode::Up => {
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Up))
+                }
+                KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Down => {
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Down))
+                }
+                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Left => {
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Left))
+                }
+                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Right => {
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Right))
+                }
+                _ => ConsoleInput::Unknown,
+            });
         }
     }
     Ok(ConsoleInput::Timeout)

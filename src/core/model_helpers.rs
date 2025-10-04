@@ -1,4 +1,4 @@
-﻿use crate::core::{Cell, GameState, UserAction};
+use crate::core::{Cell, GameState, UserAction};
 
 impl GameState {
     pub fn is_won(&self) -> bool {
@@ -11,11 +11,11 @@ impl GameState {
         }
         true
     }
-    
+
     pub fn height(&self) -> i32 {
         self.grid.len() as i32
     }
-    
+
     pub fn width(&self) -> i32 {
         if self.grid.is_empty() {
             0

@@ -1,6 +1,6 @@
-﻿use std::collections::{HashMap, HashSet};
 use crate::core::{GameState, UserAction};
 use crate::state_graph::models::{Edge, NodeMeta, StateGraph};
+use std::collections::{HashMap, HashSet};
 
 impl StateGraph {
     pub fn new() -> Self {
@@ -31,6 +31,8 @@ impl StateGraph {
     }
 
     pub fn get_node_meta_mut(&mut self, node_id: usize) -> &mut NodeMeta {
-        self.metadata.entry(node_id).or_insert_with(NodeMeta::default)
+        self.metadata
+            .entry(node_id)
+            .or_insert_with(NodeMeta::default)
     }
 }

@@ -1,7 +1,7 @@
-﻿use grapher::renderer::Renderer;
+use crate::state_graph::StateGraph;
+use grapher::renderer::Renderer;
 use grapher::simulator::SimulatorBuilder;
 use petgraph::Directed;
-use crate::state_graph::StateGraph;
 
 pub fn render_interactive_graph(graph: &StateGraph) {
     // Build a PetGraph
@@ -31,10 +31,9 @@ pub fn convert_to_petgraph(graph: &StateGraph) -> petgraph::Graph<(), (), Direct
         .collect();
 
     for edge in &graph.edges {
-        if let (Some(&from_index), Some(&to_index)) = (
-            node_map.get(&edge.from),
-            node_map.get(&edge.to),
-        ) {
+        if let (Some(&from_index), Some(&to_index)) =
+            (node_map.get(&edge.from), node_map.get(&edge.to))
+        {
             petgraph.add_edge(from_index, to_index, ());
         }
     }

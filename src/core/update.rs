@@ -2,7 +2,6 @@ use crate::core::Cell::{BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnT
 use crate::core::{Direction, GameChangeType, GameState, GameUpdate, UserAction, Vec2};
 
 pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
-
     let h = game.height();
     let w = game.width();
 
@@ -64,10 +63,13 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
             grid: new_grid,
             player: Vec2 { i: ni, j: nj },
         },
-        if pushing { GameChangeType::PlayerAndBoxMove } else { GameChangeType::PlayerMove }
+        if pushing {
+            GameChangeType::PlayerAndBoxMove
+        } else {
+            GameChangeType::PlayerMove
+        },
     )
 }
-
 
 fn vec_from_dir(dir: Direction) -> Vec2 {
     match dir {

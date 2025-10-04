@@ -1,14 +1,14 @@
-﻿use std::io;
+use crate::state_graph::StateGraph;
+use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::Alignment;
 use ratatui::prelude::{Color, Style};
-use ratatui::Terminal;
 use ratatui::widgets::*;
-use crate::state_graph::StateGraph;
+use std::io;
 
 pub fn render_graph(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    graph: &StateGraph
+    graph: &StateGraph,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Placeholder for future implementation of graph rendering
     terminal.draw(|f| {
@@ -17,7 +17,11 @@ pub fn render_graph(
         let description = get_graph_info(graph);
 
         let paragraph = Paragraph::new(description)
-            .block(Block::default().borders(Borders::ALL).title("State Graph Info"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("State Graph Info"),
+            )
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Center);
 
@@ -29,7 +33,11 @@ pub fn render_graph(
 pub fn get_graph_info(graph: &StateGraph) -> String {
     let nodes = graph.nodes.len();
     let edges = graph.edges.len();
-    let visited = graph.metadata.values().filter(|m| m.state == crate::state_graph::models::NodeState::Visited).count();
+    let visited = graph
+        .metadata
+        .values()
+        .filter(|m| m.state == crate::state_graph::models::NodeState::Visited)
+        .count();
     format!(
         "Graph has {} nodes, {} edges, {} visited nodes.",
         nodes, edges, visited
