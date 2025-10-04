@@ -26,20 +26,8 @@ impl StateGraph {
         self.nodes.get_by_right(&id)
     }
 
-    pub fn add_edge(&mut self, from: usize, to: usize, action: UserAction) {
-        self.edges.insert(Edge {
-            from, to, action
-        });
-    }
-
-    pub fn set_node_meta(&mut self, node_id: usize, meta: NodeMeta) {
-        self.metadata.insert(node_id, meta);
-    }
-
-    pub fn get_node_meta(&self, node_id: usize) -> NodeMeta {
-        self.metadata.get(&node_id)
-            .map(|x| x.clone())
-            .unwrap_or(NodeMeta::default())
+    pub fn add_edge(&mut self, edge: Edge) {
+        self.edges.insert(edge);
     }
 
     pub fn get_node_meta_mut(&mut self, node_id: usize) -> &mut NodeMeta {

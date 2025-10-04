@@ -101,6 +101,12 @@ pub fn render_game(
         } else {
             instructions.to_string()
         };
+        
+        let instructions = if let Some(change_type) = &state.last_change {
+            format!("{} | Last: {:?}", instructions, change_type)
+        } else {
+            instructions
+        };
 
         let instruction_paragraph = Paragraph::new(instructions)
             .block(Block::default().borders(Borders::ALL).title("Instructions"))
@@ -131,7 +137,14 @@ fn render_grid_to_string(grid: &Vec<Vec<Cell>>) -> String {
     result
 }
 
-pub fn handle_input() -> Result<Option<UserAction>, Box<dyn std::error::Error>> {
+pub enum ConsoleInput {
+    UserAction(UserAction),
+    Quit,
+    Timeout,
+    Unknown,
+}
+
+pub fn handle_input() -> Result<ConsoleInput, Box<dyn std::error::Error>> {
     if event::poll(std::time::Duration::from_millis(50))? {
         if let Event::Key(KeyEvent {
             code,
@@ -139,25 +152,20 @@ pub fn handle_input() -> Result<Option<UserAction>, Box<dyn std::error::Error>> 
             ..
         }) = event::read()?
         {
-            match code {
-                KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => {
-                    return Ok(Some(UserAction::Quit));
-                }
-                KeyCode::Char('w') | KeyCode::Char('W') | KeyCode::Up => {
-                    return Ok(Some(UserAction::Move(Direction::Up)));
-                }
-                KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Down => {
-                    return Ok(Some(UserAction::Move(Direction::Down)));
-                }
-                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Left => {
-                    return Ok(Some(UserAction::Move(Direction::Left)));
-                }
-                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Right => {
-                    return Ok(Some(UserAction::Move(Direction::Right)));
-                }
-                _ => {}
-            }
+            return Ok(match code {
+                KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc =>
+                    ConsoleInput::Quit,
+                KeyCode::Char('w') | KeyCode::Char('W') | KeyCode::Up =>
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Up)),
+                KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Down =>
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Down)),
+                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Left =>
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Left)),
+                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Right =>
+                    ConsoleInput::UserAction(UserAction::Move(Direction::Right)),
+                _ => ConsoleInput::Unknown
+            })
         }
     }
-    Ok(None)
+    Ok(ConsoleInput::Timeout)
 }

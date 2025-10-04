@@ -5,7 +5,6 @@ use crate::state_graph::StateGraph;
 
 pub fn render_interactive_graph(graph: &StateGraph) {
     // Build a PetGraph
-    let mut rng = rand::thread_rng();
     let graph: petgraph::Graph<(), (), Directed> = convert_to_petgraph(graph);
 
     // Configure the simulator

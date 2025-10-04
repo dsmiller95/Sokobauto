@@ -1,5 +1,5 @@
 use crate::core::Cell::{BoxOnFloor, BoxOnTarget, Floor, PlayerOnFloor, PlayerOnTarget, Target};
-use crate::core::{Direction, GameState, GameUpdate, UserAction, Vec2};
+use crate::core::{Direction, GameChangeType, GameState, GameUpdate, UserAction, Vec2};
 
 pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
 
@@ -7,7 +7,6 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
     let w = game.width();
 
     let dir = match action {
-        UserAction::Quit => return GameUpdate::NoChange,
         UserAction::Move(d) => vec_from_dir(d),
     };
 
@@ -60,10 +59,13 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
         PlayerOnFloor
     };
 
-    GameUpdate::NextState(GameState {
-        grid: new_grid,
-        player: Vec2 { i: ni, j: nj },
-    })
+    GameUpdate::NextState(
+        GameState {
+            grid: new_grid,
+            player: Vec2 { i: ni, j: nj },
+        },
+        if pushing { GameChangeType::PlayerAndBoxMove } else { GameChangeType::PlayerMove }
+    )
 }
 
 

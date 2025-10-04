@@ -1,5 +1,5 @@
 ﻿use std::collections::{HashMap, HashSet};
-use crate::core::{GameState, UserAction};
+use crate::core::{GameChangeType, GameState, UserAction};
 
 pub struct StateGraph {
     // map from game state to node id
@@ -25,6 +25,7 @@ pub struct Edge {
     pub from: usize,
     pub to: usize,
     pub action: UserAction,
+    pub game_change_type: GameChangeType,
 }
 
 pub enum PopulateResult {

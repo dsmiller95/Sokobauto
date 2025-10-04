@@ -26,7 +26,6 @@ pub enum Direction {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UserAction {
     Move(Direction),
-    Quit,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -36,7 +35,12 @@ pub struct GameState {
 }
 
 pub enum GameUpdate{
-    NextState(GameState),
-    NoChange,
+    NextState(GameState, GameChangeType),
     Error(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GameChangeType {
+    PlayerMove,
+    PlayerAndBoxMove,
 }
