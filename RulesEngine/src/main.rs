@@ -7,6 +7,7 @@ mod core;
 mod models;
 mod state_graph;
 mod test;
+mod bevy_interface;
 
 use crate::console_interface::ConsoleInput::*;
 use crate::console_interface::{
@@ -36,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ########
 # @$  .#
 # $  $ #
-# .#  #$
+# .#  ##
 # .####
 #######
 "#;
@@ -132,7 +133,12 @@ fn run_state_graph(
     f.write_all(json_data.as_bytes())?;
     println!("State graph exported to exports/state_graph.json");
 
-    render_interactive_graph(&state_graph);
+    // render_interactive_graph(&state_graph);
+    
+    // Launch 3D graph visualization
+    println!("Launching 3D graph visualization...");
+    crate::bevy_interface::visualize_graph(&state_graph, shared);
+    
     Ok(())
 }
 
@@ -198,5 +204,6 @@ fn run_interactive(
     }
 
     cleanup_terminal()?;
+    
     Ok(())
 }
