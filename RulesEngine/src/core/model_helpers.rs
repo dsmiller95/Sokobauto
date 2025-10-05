@@ -15,21 +15,6 @@ impl GameState {
         }
         true
     }
-
-    pub fn count_boxes_on_goals(&self, shared: &SharedGameState) -> usize {
-        let mut count = 0;
-        for (i, row) in shared.grid.iter().enumerate() {
-            for (j, &c) in row.iter().enumerate() {
-                if c == Cell::Target {
-                    let pos = Vec2 { i: i as i32, j: j as i32 };
-                    if self.boxes.contains(&pos) {
-                        count += 1;
-                    }
-                }
-            }
-        }
-        count
-    }
 }
 
 impl SharedGameState {
@@ -43,6 +28,21 @@ impl SharedGameState {
         } else {
             self.grid[0].len() as i32
         }
+    }
+
+    pub fn count_boxes_on_goals(&self, boxes: &Vec<Vec2>) -> usize {
+        let mut count = 0;
+        for (i, row) in self.grid.iter().enumerate() {
+            for (j, &c) in row.iter().enumerate() {
+                if c == Cell::Target {
+                    let pos = Vec2 { i: i as i32, j: j as i32 };
+                    if boxes.contains(&pos) {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        count
     }
 }
 

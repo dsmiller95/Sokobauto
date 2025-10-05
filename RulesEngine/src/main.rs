@@ -14,7 +14,7 @@ use crate::console_interface::{
 };
 use crate::core::{GameState, GameUpdate, step, SharedGameState};
 use crate::models::GameRenderState;
-use crate::state_graph::{PopulateResult, StateGraph, get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, GraphRenderState};
+use crate::state_graph::{PopulateResult, StateGraph, get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, GraphRenderState, get_box_only_graph};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use std::io;
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // "#;
     let level = r#"
 ########
-#  $   #
+#  $  .#
 #  @ $ #
 # .#   #
 ########
@@ -110,7 +110,9 @@ fn run_state_graph(
 
     println!("{}", get_graph_info(&state_graph));
 
-    let json_data = get_json_data(&state_graph, shared);
+    let box_only_graph = get_box_only_graph(&state_graph);
+    let json_data = get_json_data(&box_only_graph, shared);
+
     std::fs::create_dir_all("exports")?;
     let mut f = std::fs::OpenOptions::new()
         .write(true)
@@ -119,7 +121,7 @@ fn run_state_graph(
     f.write_all(json_data.as_bytes())?;
     println!("State graph exported to exports/state_graph.json");
 
-    render_interactive_graph(&state_graph);
+    render_interactive_graph(&box_only_graph);
     Ok(())
 }
 
