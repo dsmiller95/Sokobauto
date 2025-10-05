@@ -71,6 +71,15 @@ impl GameTestState {
         update
     }
 
+    fn try_step(&mut self, action: UserAction) -> GameUpdate {
+        let update = step(&self.shared, &self.game_state, action);
+        if let GameUpdate::NextState(new_state, _change_type) = &update {
+            self.game_state = new_state.clone();
+        };
+
+        update
+    }
+
     fn assert_matches(&self, expected: &str) {
         let actual = self.game_to_string();
         assert_eq_text!(expected.trim_matches('\n'), actual.as_str().trim_matches('\n'));
@@ -112,6 +121,21 @@ mod test {
 
         let expected_level = r#"
 # @$#
+"#;
+        game.assert_matches(expected_level);
+    }
+
+
+    #[test]
+    fn when_block_pushed_into_block_remains_two_blocks(){
+        let level = r#"
+#@$$ #
+"#;
+        let mut game = GameTestState::new(level);
+        game.try_step(UserAction::Move(Right));
+
+        let expected_level = r#"
+#@$$ #
 "#;
         game.assert_matches(expected_level);
     }
