@@ -71,11 +71,8 @@ impl GraphInfo {
     pub fn new(graph: &StateGraph) -> Self {
         let nodes = graph.nodes.len();
         let edges = graph.edges.len();
-        let visited = graph
-            .metadata
-            .values()
-            .filter(|m| m.state == crate::state_graph::models::NodeState::Visited)
-            .count();
+        let unvisited = graph.unvisited.len();
+        let visited = nodes - unvisited;
         let percent_visited = if nodes > 0 {
             (visited as f64 / nodes as f64) * 100.0
         } else {

@@ -36,10 +36,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // "#;
     let level = r#"
 ########
-#  $  .#
-#  @ $ #
-# .#   #
-########
+# @$  .#
+# $  $ #
+# .#  #$
+# .####
+#######
 "#;
 
     let (game_state, shared) = parse_level(level);
@@ -85,7 +86,7 @@ fn run_state_graph(
     })?;
 
     'outer: loop {
-        let stop_time = std::time::Instant::now() + std::time::Duration::from_millis(100);
+        let stop_time = std::time::Instant::now() + std::time::Duration::from_millis(1000);
         while std::time::Instant::now() < stop_time {
             let PopulateResult::Populated = populate_step(&mut state_graph, shared) else {
                 break 'outer;

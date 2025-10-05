@@ -4,21 +4,9 @@ use std::collections::{HashMap, HashSet};
 pub struct StateGraph {
     // map from game state to node id
     pub nodes: bimap::BiMap<GameState, usize>,
-    pub metadata: HashMap<usize, NodeMeta>,
     pub edges: HashSet<Edge>,
     pub unvisited: HashSet<usize>,
-}
-
-#[derive(Default, Clone)]
-pub struct NodeMeta {
-    pub state: NodeState,
-}
-
-#[derive(Eq, PartialEq, Default, Clone)]
-pub enum NodeState {
-    #[default]
-    Unvisited,
-    Visited,
+    pub next_id: usize,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]

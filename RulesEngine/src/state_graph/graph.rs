@@ -1,14 +1,14 @@
 use crate::core::{GameState};
-use crate::state_graph::models::{Edge, NodeMeta, NodeState, StateGraph};
-use std::collections::{HashMap, HashSet};
+use crate::state_graph::models::{Edge, StateGraph};
+use std::collections::{HashSet};
 
 impl StateGraph {
     pub fn new() -> Self {
         StateGraph {
             nodes: bimap::BiMap::new(),
-            metadata: HashMap::new(),
             edges: HashSet::new(),
             unvisited: HashSet::new(),
+            next_id: 0,
         }
     }
 
@@ -16,9 +16,11 @@ impl StateGraph {
         if let Some(&id) = self.nodes.get_by_left(&state) {
             id
         } else {
-            let id = self.nodes.len();
-            self.nodes.insert(state, id);
-            self.metadata.insert(id, NodeMeta::default());
+            let id = self.next_id;
+            self.next_id += 1;
+
+            // we know that this insertion is unique, because id is unique, and we just checked to ensure that te state is unique
+            self.nodes.insert_no_overwrite(state, id).unwrap();
             self.unvisited.insert(id);
             id
         }
@@ -33,9 +35,6 @@ impl StateGraph {
     }
 
     pub fn mark_visited(&mut self, node_id: usize) {
-        if let Some(meta) = self.metadata.get_mut(&node_id) {
-            meta.state = NodeState::Visited;
-        }
         self.unvisited.remove(&node_id);
     }
 
@@ -44,18 +43,6 @@ impl StateGraph {
     }
 
     pub fn assert_all_visited(&self) {
-        let unvisited_meta = self.metadata
-            .iter()
-            .filter(|(_, meta)| {
-                if meta.state == NodeState::Unvisited {
-                    true
-                } else {
-                    false
-                }
-            })
-            .count();
-
         assert!(self.unvisited.is_empty());
-        assert_eq!(unvisited_meta, 0);
     }
 }
