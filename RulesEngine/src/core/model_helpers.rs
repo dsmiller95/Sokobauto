@@ -1,19 +1,13 @@
-use crate::core::{Cell, GameChangeType, GameState, SharedGameState, UserAction};
+use crate::core::{Cell, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
 use crate::models::Vec2;
 
-impl GameState {
-    pub fn is_won(&self, shared: &SharedGameState) -> bool {
-        for (i, row) in shared.grid.iter().enumerate() {
-            for (j, &c) in row.iter().enumerate() {
-                if c == Cell::Target {
-                    let pos = Vec2 { i: i as i32, j: j as i32 };
-                    if !self.environment.boxes.contains(&pos) {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
+pub struct WonCheckHelper {
+    target_positions_sorted: Vec<Vec2>,
+}
+
+impl WonCheckHelper {
+    pub fn is_won(&self, game_state: &GameStateEnvironment) -> bool {
+        self.target_positions_sorted.iter().all(|p| game_state.boxes.contains(p))
     }
 }
 
@@ -35,6 +29,35 @@ impl SharedGameState {
             i: self.height(),
             j: self.width(),
         }
+    }
+
+    pub fn get_won_check_helper(&self) -> WonCheckHelper {
+        let mut target_positions = Vec::new();
+        for (i, row) in self.grid.iter().enumerate() {
+            for (j, &c) in row.iter().enumerate() {
+                if c == Cell::Target {
+                    target_positions.push(Vec2 { i: i as i32, j: j as i32 });
+                }
+            }
+        }
+        target_positions.sort();
+        WonCheckHelper {
+            target_positions_sorted: target_positions,
+        }
+    }
+
+    pub fn is_won(&self, game_state: &GameState) -> bool {
+        for (i, row) in self.grid.iter().enumerate() {
+            for (j, &c) in row.iter().enumerate() {
+                if c == Cell::Target {
+                    let pos = Vec2 { i: i as i32, j: j as i32 };
+                    if !game_state.environment.boxes.contains(&pos) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 
     pub fn count_boxes_on_goals(&self, boxes: &Vec<Vec2>) -> usize {
