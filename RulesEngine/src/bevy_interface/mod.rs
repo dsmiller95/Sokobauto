@@ -5,6 +5,7 @@ use crate::core::SharedGameState;
 use rand::Rng;
 use std::collections::HashMap;
 use bevy::mesh::ConeAnchor;
+use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 
 #[derive(Component)]
 struct GraphNode {
@@ -32,9 +33,12 @@ struct PhysicsConfig {
     max_velocity: f32,
 }
 
+#[derive(Component)]
+struct FpsText;
+
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
     let graph_data = GraphData::from_state_graph(graph, shared);
-    
+
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -45,6 +49,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             ..default()
         }))
         .add_plugins(PanOrbitCameraPlugin)
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(graph_data)
         .insert_resource(PhysicsConfig {
             repulsion_strength: 50.0,
@@ -52,8 +57,8 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             damping: 0.95,
             max_velocity: 10.0,
         })
-        .add_systems(Startup, (setup_scene, setup_graph_from_data).chain())
-        .add_systems(Update, (apply_forces, update_edges))
+        .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_compute_cache, setup_fps_counter).chain())
+        .add_systems(Update, (apply_forces, update_edges, update_fps_counter))
         .run();
 }
 
@@ -97,6 +102,39 @@ impl GraphData {
             .unwrap_or(1);
         
         Self { nodes, edges, max_on_targets }
+    }
+}
+
+// resource which holds precomputed data. must be updated accordingly whenever the graph changes.
+#[derive(Resource)]
+struct GraphComputeCache {
+    // map of node IDs to every one of their neighbors, in both directions.
+    neighbor_map: HashMap<usize, Vec<usize>>,
+    // map of node IDs to their Entity
+    entity_map: HashMap<usize, Entity>,
+}
+
+impl GraphComputeCache {
+    fn from_graph(graph: &GraphData, all_nodes: Vec<(usize, Entity)>) -> Self {
+        let mut neighbor_map: HashMap<usize, Vec<usize>> = HashMap::new();
+
+        for edge in &graph.edges {
+            neighbor_map.entry(edge.from).or_default().push(edge.to);
+            neighbor_map.entry(edge.to).or_default().push(edge.from);
+        }
+
+        for neighbors in neighbor_map.values_mut() {
+            neighbors.sort_unstable();
+            neighbors.dedup();
+            neighbors.shrink_to_fit();
+        }
+
+        let entity_map: HashMap<usize, Entity> = all_nodes.into_iter().collect();
+
+        Self {
+            neighbor_map,
+            entity_map
+        }
     }
 }
 
@@ -191,65 +229,65 @@ fn setup_graph_from_data(
     commands.insert_resource(NodePositions { positions: node_positions });
 }
 
+fn setup_compute_cache(
+    node_query: Query<(&GraphNode, Entity)>,
+    mut commands: Commands,
+    graph_data: Res<GraphData>,
+) {
+    let all_nodes: Vec<(usize, Entity)> = node_query.iter()
+        .map(|(node, entity)| (node.id, entity))
+        .collect();
+    let compute_cache = GraphComputeCache::from_graph(
+        &graph_data,
+        all_nodes
+    );
+    commands.insert_resource(compute_cache);
+}
+
 fn apply_forces(
     mut node_query: Query<(&mut Transform, &mut GraphNode)>,
-    edge_query: Query<&GraphEdge>,
     mut node_positions: ResMut<NodePositions>,
+    compute_cache: Res<GraphComputeCache>,
     physics: Res<PhysicsConfig>,
     time: Res<Time>,
 ) {
+    if time.elapsed().as_secs_f32() > 60.0 {
+        return;
+    }
+    println!("Simulating step at t={:.2}", time.elapsed().as_secs_f32());
+
     let dt = time.delta_secs();
     
-    // Collect all node data for iteration
-    let mut nodes_data: Vec<(usize, Vec3, Vec3)> = Vec::new();
+    let mut nodes_data: Vec<(usize, Vec3)> = Vec::new();
     for (transform, node) in node_query.iter() {
-        nodes_data.push((node.id, transform.translation, node.velocity));
+        nodes_data.push((node.id, transform.translation));
     }
-    
-    // Collect all edges for attraction forces
-    let edges: Vec<_> = edge_query.iter().collect();
+    let mut nodes_data_lookup: HashMap<usize, Vec3> = HashMap::new();
+    for (id, pos) in &nodes_data {
+        nodes_data_lookup.insert(*id, *pos);
+    }
     
     for (mut transform, mut node) in node_query.iter_mut() {
         let mut force = Vec3::ZERO;
         let current_pos = transform.translation;
-        
-        // Repulsion forces from all other nodes
-        for &(other_id, other_pos, _) in &nodes_data {
-            if node.id != other_id {
-                let diff = current_pos - other_pos;
-                let distance = diff.length().max(0.1);
-                let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                force += repulsion;
-            }
+
+        for &(other_id, other_pos) in &nodes_data {
+            if node.id == other_id { continue; }
+
+            let diff = current_pos - other_pos;
+            let distance = diff.length().max(0.1);
+            let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
+            force += repulsion;
         }
-        
-        // Attraction forces along edges
-        for edge in &edges {
-            let mut connected_node_pos = None;
-            
-            if edge.from_id == node.id {
-                // Find the "to" node position
-                for &(other_id, other_pos, _) in &nodes_data {
-                    if other_id == edge.to_id {
-                        connected_node_pos = Some(other_pos);
-                        break;
-                    }
+
+        if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
+            for &neighbor_id in neighbors {
+                if let Some(&neighbor_pos) = nodes_data_lookup.get(&neighbor_id) {
+                    let diff = neighbor_pos - current_pos;
+                    let distance = diff.length().max(0.1);
+                    let attraction = diff.normalize() * physics.attraction_strength * distance;
+                    force += attraction;
                 }
-            } else if edge.to_id == node.id {
-                // Find the "from" node position
-                for &(other_id, other_pos, _) in &nodes_data {
-                    if other_id == edge.from_id {
-                        connected_node_pos = Some(other_pos);
-                        break;
-                    }
-                }
-            }
-            
-            if let Some(connected_pos) = connected_node_pos {
-                let diff = connected_pos - current_pos;
-                let distance = diff.length().max(0.1);
-                let attraction = diff.normalize() * physics.attraction_strength * distance;
-                force += attraction;
             }
         }
         
@@ -275,7 +313,11 @@ fn apply_forces(
 fn update_edges(
     mut edge_query: Query<(&mut Transform, &GraphEdge)>,
     node_positions: Res<NodePositions>,
+    time: Res<Time>,
 ) {
+    if time.elapsed().as_secs_f32() > 60.0 {
+        return;
+    }
     for (mut transform, edge) in edge_query.iter_mut() {
         if let (Some(&from_pos), Some(&to_pos)) = (
             node_positions.positions.get(&edge.from_id),
@@ -304,6 +346,33 @@ fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {
         on_targets as f32 / max_on_targets as f32
     };
     
-    // Interpolate from red (1,0,0) to blue (0,0,1)
     Color::srgb(1.0 - t, 0.0, t)
+}
+
+fn setup_fps_counter(mut commands: Commands) {
+    commands.spawn((
+        Text::new("FPS: --"),
+        TextFont {
+            font_size: 24.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(10.0),
+            left: Val::Px(10.0),
+            ..default()
+        },
+        FpsText,
+    ));
+}
+
+fn update_fps_counter(
+    diagnostics: Res<DiagnosticsStore>,
+    mut fps_text_query: Query<&mut Text, With<FpsText>>,
+) {
+    let Ok(mut text) = fps_text_query.single_mut() else { return };
+    let Some(fps_diagnostic) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) else { return };
+    let Some(fps_smoothed) = fps_diagnostic.smoothed() else { return };
+    text.0 = format!("FPS: {:.1}", fps_smoothed);
 }
