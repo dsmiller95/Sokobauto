@@ -60,13 +60,18 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
 #[derive(Resource)]
 struct GraphData {
     nodes: Vec<GraphNodeData>,
-    edges: Vec<(usize, usize)>,
+    edges: Vec<GraphEdgeData>,
     max_on_targets: usize,
 }
 
 struct GraphNodeData {
     id: usize,
     on_targets: usize,
+}
+
+struct GraphEdgeData {
+    from: usize,
+    to: usize,
 }
 
 impl GraphData {
@@ -78,8 +83,11 @@ impl GraphData {
             })
             .collect();
         
-        let edges: Vec<(usize, usize)> = graph.edges.iter()
-            .map(|edge| (edge.from, edge.to))
+        let edges: Vec<GraphEdgeData> = graph.edges.iter()
+            .map(|edge| GraphEdgeData {
+                from: edge.from,
+                to: edge.to,
+            })
             .collect();
         
         let max_on_targets = nodes.iter()
@@ -138,6 +146,7 @@ fn setup_graph_from_data(
         let color = interpolate_color(node_data.on_targets, graph_data.max_on_targets);
         
         commands.spawn((
+            // TODO: share mesh and materials?
             Mesh3d(meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap())),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: color,
@@ -157,7 +166,9 @@ fn setup_graph_from_data(
     }
     
     // Create edges
-    for &(from_id, to_id) in &graph_data.edges {
+    for edge in graph_data.edges.iter() {
+        let from_id = edge.from;
+        let to_id = edge.to;
         if let (Some(&from_pos), Some(&to_pos)) = (
             node_positions.get(&from_id),
             node_positions.get(&to_id),
@@ -167,7 +178,7 @@ fn setup_graph_from_data(
             let center = (from_pos + to_pos) / 2.0;
             
             commands.spawn((
-                Mesh3d(meshes.add(Capsule3d::new(0.1, distance))),
+                Mesh3d(meshes.add(Capsule3d::new(0.1, 1.0))),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: Color::srgb(0.7, 0.7, 0.7),
                     metallic: 0.1,
@@ -175,7 +186,7 @@ fn setup_graph_from_data(
                     ..default()
                 })),
                 Transform::from_translation(center)
-                    .looking_to(direction, Vec3::Y),
+                    .align(Dir3::NEG_X, direction, Dir3::Y, Vec3::Y),
                 GraphEdge {
                     from_id,
                     to_id,
@@ -282,8 +293,9 @@ fn update_edges(
             let center = (from_pos + to_pos) / 2.0;
             
             transform.translation = center;
-            transform.look_to(direction, Vec3::Y);
-            transform.scale.y = distance / 2.0; // Adjust scale for capsule length
+            transform
+                .align(Dir3::Y, direction, Dir3::Z, Vec3::Z);
+            transform.scale.y = distance;
         }
     }
 }
