@@ -28,14 +28,10 @@
     {
       "source": 1,
       "target": 2,
-      "dir": "Down",
-      "change_type": "PlayerMove"
     },
     {
       "source": 2,
-                "target": 3,
-      "dir": "Left",
-      "change_type": "PlayerAndBoxMove"
+      "target": 3,
     }
   ]
 };
@@ -50,9 +46,6 @@
             .nodeAutoColorBy('on_targets')
             .linkSource('source')
             .linkTarget('target')
-            .linkAutoColorBy('change_type')
-            .linkLabel((link) => `${link.change_type} ${link.dir}`)
-            .linkVisibility((link) => link.change_type === "PlayerAndBoxMove")
             .linkDirectionalArrowLength(3.5)
             .linkDirectionalArrowRelPos(1)
             .linkDirectionalParticles(0.5);
