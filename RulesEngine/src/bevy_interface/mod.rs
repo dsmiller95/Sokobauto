@@ -4,6 +4,7 @@ use crate::state_graph::StateGraph;
 use crate::core::SharedGameState;
 use rand::Rng;
 use std::collections::HashMap;
+use bevy::mesh::ConeAnchor;
 
 #[derive(Component)]
 struct GraphNode {
@@ -102,22 +103,6 @@ impl GraphData {
 fn setup_scene(
     mut commands: Commands,
 ) {
-    // Add lighting
-    commands.spawn((
-        DirectionalLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    // Add ambient light
-    commands.insert_resource(AmbientLight {
-        color: Color::WHITE,
-        brightness: 0.3,
-        affects_lightmapped_meshes: true,
-    });
-
     // Add camera with pan/orbit controls
     commands.spawn((
         Camera3d::default(),
@@ -141,8 +126,7 @@ fn setup_graph_from_data(
         let color = interpolate_color(on_targets, graph_data.max_on_targets);
         materials.add(StandardMaterial {
             base_color: color,
-            metallic: 0.3,
-            perceptual_roughness: 0.4,
+            unlit: true,
             ..default()
         })
     })
@@ -169,11 +153,16 @@ fn setup_graph_from_data(
         node_positions.insert(node_data.id, position);
     }
 
-    let edge_mesh = meshes.add(Capsule3d::new(0.1, 1.0));
+    let mut arrow_mesh = Cone::new(0.15, 0.2).mesh()
+        .anchor(ConeAnchor::Tip).resolution(8).build();
+    arrow_mesh.translate_by(Vec3::new(0.0, 0.3, 0.0));
+    let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0));
+    edge_mesh.merge(&arrow_mesh).unwrap();
+
+    let edge_mesh_handle = meshes.add(edge_mesh);
     let edge_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.7, 0.7, 0.7),
-        metallic: 0.1,
-        perceptual_roughness: 0.8,
+        unlit: true,
         ..default()
     });
 
@@ -188,7 +177,7 @@ fn setup_graph_from_data(
             set_edge_transform(&mut transform, from_pos, to_pos);
 
             commands.spawn((
-                Mesh3d(edge_mesh.clone()),
+                Mesh3d(edge_mesh_handle.clone()),
                 MeshMaterial3d(edge_material.clone()),
                 transform,
                 GraphEdge {
