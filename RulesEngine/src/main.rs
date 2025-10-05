@@ -6,6 +6,7 @@ mod console_interface;
 mod core;
 mod models;
 mod state_graph;
+mod tests;
 
 use crate::console_interface::ConsoleInput::*;
 use crate::console_interface::{
@@ -24,15 +25,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // A tiny built-in level (Sokoban-like)
     // You can add more and switch by index.
-    let level = r#"
-        ####
-#########  ##
-#           ###
-#  @$$ ##   ..#
-#  $$   ##  ..#
-#          ####
-############
-"#;
+//     let level = r#"
+//         ####
+// #########  ##
+// #           ###
+// #  @$$ ##   ..#
+// #  $$   ##  ..#
+// #          ####
+// ############
+// "#;
     let level = r#"
 ########
 #  $   #

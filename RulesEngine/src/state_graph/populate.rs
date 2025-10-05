@@ -1,6 +1,6 @@
 use crate::core::{GameUpdate, UserAction, step, SharedGameState};
 use crate::state_graph::Edge;
-use crate::state_graph::models::{NodeState, PopulateResult, StateGraph};
+use crate::state_graph::models::{PopulateResult, StateGraph};
 
 pub fn populate_node(graph: &mut StateGraph, from_id: usize, shared: &SharedGameState) {
     let Some(from_state) = graph.get_state(from_id) else {

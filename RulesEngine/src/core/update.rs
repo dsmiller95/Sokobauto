@@ -1,5 +1,4 @@
-use std::ops::IndexMut;
-use crate::core::Cell::{Floor, Target, Wall};
+use crate::core::Cell::{Wall};
 use crate::core::{Direction, GameChangeType, GameState, GameUpdate, SharedGameState, UserAction, Vec2};
 
 pub fn step(

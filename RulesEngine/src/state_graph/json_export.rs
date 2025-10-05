@@ -1,4 +1,4 @@
-use crate::core::{Cell, SharedGameState, UserAction};
+use crate::core::{SharedGameState, UserAction};
 use crate::state_graph::StateGraph;
 use serde::{Deserialize, Serialize};
 

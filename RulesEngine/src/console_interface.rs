@@ -18,7 +18,14 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
     let mut player = Vec2 { i: 0, j: 0 };
     let mut boxes: Vec<Vec2> = Vec::new();
     let max_width = s.lines().map(|line| line.len()).max().unwrap_or(0);
-    for (i, line) in s.lines().enumerate() {
+    
+    let mut i = 0;
+    for line in s.lines() {
+        let line = line.trim();
+        if line.len() == 0 {
+            continue;
+        }
+        
         let mut row = Vec::new();
         for (j, ch) in line.chars().enumerate() {
             let c = match ch {
@@ -62,6 +69,7 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
             row.push(Floor);
         }
         grid.push(row);
+        i += 1;
     }
 
     (
@@ -137,7 +145,7 @@ pub fn render_game(
     Ok(())
 }
 
-fn render_game_to_string(shared: &SharedGameState, game: &GameState) -> String {
+pub fn render_game_to_string(shared: &SharedGameState, game: &GameState) -> String {
     let mut result = String::new();
     for (i, row) in shared.grid.iter().enumerate() {
         for (j, c) in row.iter().enumerate() {
