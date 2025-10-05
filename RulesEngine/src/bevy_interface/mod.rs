@@ -173,10 +173,11 @@ fn setup_graph_from_data(
             node_positions.get(&from_id),
             node_positions.get(&to_id),
         ) {
-            let direction = (to_pos - from_pos).normalize();
-            let distance = from_pos.distance(to_pos);
             let center = (from_pos + to_pos) / 2.0;
-            
+
+            let mut transform = Transform::default();
+            set_edge_transform(&mut transform, from_pos, to_pos);
+
             commands.spawn((
                 Mesh3d(meshes.add(Capsule3d::new(0.1, 1.0))),
                 MeshMaterial3d(materials.add(StandardMaterial {
@@ -185,8 +186,7 @@ fn setup_graph_from_data(
                     perceptual_roughness: 0.8,
                     ..default()
                 })),
-                Transform::from_translation(center)
-                    .align(Dir3::NEG_X, direction, Dir3::Y, Vec3::Y),
+                transform,
                 GraphEdge {
                     from_id,
                     to_id,
@@ -288,16 +288,20 @@ fn update_edges(
             node_positions.positions.get(&edge.from_id),
             node_positions.positions.get(&edge.to_id),
         ) {
-            let direction = (to_pos - from_pos).normalize();
-            let distance = from_pos.distance(to_pos);
-            let center = (from_pos + to_pos) / 2.0;
-            
-            transform.translation = center;
-            transform
-                .align(Dir3::Y, direction, Dir3::Z, Vec3::Z);
-            transform.scale.y = distance;
+            set_edge_transform(&mut *transform, from_pos, to_pos);
         }
     }
+}
+
+fn set_edge_transform(transform: &mut Transform, from: Vec3, to: Vec3) {
+    let direction = (to - from).normalize();
+    let distance = from.distance(to);
+    let center = (from + to) / 2.0;
+
+    transform.translation = center;
+    transform
+        .align(Dir3::Y, direction, Dir3::Z, Vec3::Z);
+    transform.scale.y = distance;
 }
 
 fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {
