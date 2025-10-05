@@ -262,11 +262,7 @@ fn apply_forces(
     for (transform, node) in node_query.iter() {
         nodes_data.push((node.id, transform.translation));
     }
-    let mut nodes_data_lookup: HashMap<usize, Vec3> = HashMap::new();
-    for (id, pos) in &nodes_data {
-        nodes_data_lookup.insert(*id, *pos);
-    }
-    
+
     for (mut transform, mut node) in node_query.iter_mut() {
         let mut force = Vec3::ZERO;
         let current_pos = transform.translation;
@@ -282,7 +278,7 @@ fn apply_forces(
 
         if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
             for &neighbor_id in neighbors {
-                if let Some(&neighbor_pos) = nodes_data_lookup.get(&neighbor_id) {
+                if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
                     let diff = neighbor_pos - current_pos;
                     let distance = diff.length().max(0.1);
                     let attraction = diff.normalize() * physics.attraction_strength * distance;
