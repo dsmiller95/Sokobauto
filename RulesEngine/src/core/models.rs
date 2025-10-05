@@ -31,8 +31,13 @@ pub struct SharedGameState {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct GameState {
-    pub boxes: Vec<Vec2>,
+    pub environment: GameStateEnvironment,
     pub player: Vec2,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct GameStateEnvironment {
+    pub boxes: Vec<Vec2>,
 }
 
 #[derive(Debug)]

@@ -1,40 +1,27 @@
-use crate::core::{GameChangeType, GameState, UserAction, Vec2};
-use std::collections::{HashMap, HashSet};
+use crate::core::{GameStateEnvironment, Vec2};
+use std::collections::{HashSet};
 
 pub struct StateGraph {
     // map from game state to node id
-    pub nodes: bimap::BiMap<GameState, usize>,
+    pub nodes: bimap::BiMap<UniqueNode, usize>,
     pub edges: HashSet<Edge>,
     pub unvisited: HashSet<usize>,
     pub next_id: usize,
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub struct UniqueNode {
+    pub environment: GameStateEnvironment,
+    pub minimum_reachable_player_position: Vec2,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub struct Edge {
     pub from: usize,
     pub to: usize,
-    pub action: UserAction,
-    pub game_change_type: GameChangeType,
 }
 
 pub enum PopulateResult {
     AllVisited,
     Populated,
-}
-
-
-pub struct BoxOnlyStateGraph {
-    pub nodes: HashMap<BoxOnlyGameState, usize>,
-    pub edges: HashSet<BoxOnlyEdge>,
-}
-
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct BoxOnlyGameState {
-    pub boxes: Vec<Vec2>,
-}
-
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct BoxOnlyEdge {
-    pub from: usize,
-    pub to: usize,
 }

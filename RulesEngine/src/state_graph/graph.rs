@@ -1,5 +1,4 @@
-use crate::core::{GameState};
-use crate::state_graph::models::{Edge, StateGraph};
+use crate::state_graph::models::{Edge, StateGraph, UniqueNode};
 use std::collections::{HashSet};
 
 impl StateGraph {
@@ -12,7 +11,7 @@ impl StateGraph {
         }
     }
 
-    pub fn upsert_state(&mut self, state: GameState) -> usize {
+    pub fn upsert_state(&mut self, state: UniqueNode) -> usize {
         if let Some(&id) = self.nodes.get_by_left(&state) {
             id
         } else {
@@ -26,7 +25,7 @@ impl StateGraph {
         }
     }
 
-    pub fn get_state(&self, id: usize) -> Option<&GameState> {
+    pub fn get_state(&self, id: usize) -> Option<&UniqueNode> {
         self.nodes.get_by_right(&id)
     }
 

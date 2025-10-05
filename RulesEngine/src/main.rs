@@ -6,15 +6,15 @@ mod console_interface;
 mod core;
 mod models;
 mod state_graph;
-mod tests;
+mod test;
 
 use crate::console_interface::ConsoleInput::*;
 use crate::console_interface::{
     cleanup_terminal, handle_input, parse_level, render_game, setup_terminal,
 };
-use crate::core::{GameState, GameUpdate, step, SharedGameState};
+use crate::core::{step, GameState, GameUpdate, SharedGameState};
 use crate::models::GameRenderState;
-use crate::state_graph::{PopulateResult, StateGraph, get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, GraphRenderState, get_box_only_graph};
+use crate::state_graph::{get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, GraphRenderState, PopulateResult, StateGraph, UniqueNode};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use std::io;
@@ -23,16 +23,14 @@ use std::io::Write;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let switch = std::env::args().nth(1).unwrap_or("interactive".to_string());
 
-    // A tiny built-in level (Sokoban-like)
-    // You can add more and switch by index.
 //     let level = r#"
-//         ####
-// #########  ##
-// #           ###
-// #  @$$ ##   ..#
-// #  $$   ##  ..#
-// #          ####
-// ############
+//        ####
+// ########  ##
+// #          ###
+// # @$$ ##   ..#
+// # $$   ##  ..#
+// #         ####
+// ###########
 // "#;
     let level = r#"
 ########
@@ -71,7 +69,14 @@ fn run_state_graph(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut state_graph = StateGraph::new();
-    state_graph.upsert_state(game_state);
+    let min_reachable_position = shared
+        .reachable_positions(&game_state)
+        .into_iter().min().unwrap();
+    let first_node = UniqueNode {
+        environment: game_state.environment,
+        minimum_reachable_player_position: min_reachable_position,
+    };
+    state_graph.upsert_state(first_node);
 
     let start_time = std::time::Instant::now();
     let mut last_render_time = start_time;
@@ -111,8 +116,7 @@ fn run_state_graph(
 
     println!("{}", get_graph_info(&state_graph));
 
-    let box_only_graph = get_box_only_graph(&state_graph);
-    let json_data = get_json_data(&box_only_graph, shared);
+    let json_data = get_json_data(&state_graph, shared);
 
     std::fs::create_dir_all("exports")?;
     let mut f = std::fs::OpenOptions::new()
@@ -122,7 +126,7 @@ fn run_state_graph(
     f.write_all(json_data.as_bytes())?;
     println!("State graph exported to exports/state_graph.json");
 
-    render_interactive_graph(&box_only_graph);
+    render_interactive_graph(&state_graph);
     Ok(())
 }
 

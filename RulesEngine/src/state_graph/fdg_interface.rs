@@ -2,9 +2,8 @@ use crate::state_graph::StateGraph;
 use grapher::renderer::Renderer;
 use grapher::simulator::SimulatorBuilder;
 use petgraph::Directed;
-use crate::state_graph::models::BoxOnlyStateGraph;
 
-pub fn render_interactive_graph(graph: &BoxOnlyStateGraph) {
+pub fn render_interactive_graph(graph: &StateGraph) {
     // Build a PetGraph
     let graph: petgraph::Graph<(), (), Directed> = convert_to_petgraph(graph);
 
@@ -19,7 +18,7 @@ pub fn render_interactive_graph(graph: &BoxOnlyStateGraph) {
     renderer.create_window();
 }
 
-pub fn convert_to_petgraph(graph: &BoxOnlyStateGraph) -> petgraph::Graph<(), (), Directed> {
+pub fn convert_to_petgraph(graph: &StateGraph) -> petgraph::Graph<(), (), Directed> {
     let mut petgraph = petgraph::Graph::new();
 
     let node_map: std::collections::HashMap<usize, petgraph::graph::NodeIndex> = graph

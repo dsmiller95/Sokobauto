@@ -1,6 +1,6 @@
 use crate::core::{SharedGameState};
 use serde::{Deserialize, Serialize};
-use crate::state_graph::models::BoxOnlyStateGraph;
+use crate::state_graph::StateGraph;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct JsonData {
@@ -20,9 +20,9 @@ struct JsonEdge {
     target: usize,
 }
 
-pub fn get_json_data(graph: &BoxOnlyStateGraph, shared: &SharedGameState) -> String {
+pub fn get_json_data(graph: &StateGraph, shared: &SharedGameState) -> String {
     let nodes: Vec<JsonNode> = graph.nodes.iter().map(|(state, id)| {
-        let on_targets = shared.count_boxes_on_goals(&state.boxes);
+        let on_targets = shared.count_boxes_on_goals(&state.environment.boxes);
         JsonNode {
             id: *id,
             on_targets,

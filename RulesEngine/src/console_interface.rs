@@ -1,4 +1,4 @@
-use crate::core::{Direction, GameState, SharedGameState, UserAction};
+use crate::core::{Direction, GameState, GameStateEnvironment, SharedGameState, UserAction};
 use crate::models::Cell::{
     Floor, Target, Wall,
 };
@@ -75,7 +75,9 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
     (
         GameState {
             player,
-            boxes
+            environment: GameStateEnvironment {
+                boxes
+            },
         },
         SharedGameState {
             grid,
@@ -154,7 +156,7 @@ pub fn render_game_to_string(shared: &SharedGameState, game: &GameState) -> Stri
                 j: j as i32,
             };
             let has_player = pos == game.player;
-            let has_box = game.boxes.contains(&pos);
+            let has_box = game.environment.boxes.contains(&pos);
             let ch = match c {
                 Wall => '#',
                 Floor => if has_player { '@' } else { if has_box { '$' } else { ' ' } },

@@ -1,5 +1,5 @@
 use crate::core::Cell::{Wall};
-use crate::core::{Direction, GameChangeType, GameState, GameUpdate, SharedGameState, UserAction, Vec2};
+use crate::core::{Direction, GameChangeType, GameState, GameStateEnvironment, GameUpdate, SharedGameState, UserAction, Vec2};
 
 pub fn step(
     shared: &SharedGameState,
@@ -24,8 +24,8 @@ pub fn step(
 
     let dest = shared.grid[ni as usize][nj as usize];
 
-    let pushing = game.boxes.iter().position(|&x| x == dest_pos);
-    let mut new_boxes = game.boxes.clone();
+    let pushing = game.environment.boxes.iter().position(|&x| x == dest_pos);
+    let mut new_boxes = game.environment.boxes.clone();
     if let Some(pushed_box_index) = pushing {
         let bi = ni + dir.i;
         let bj = nj + dir.j;
@@ -40,7 +40,7 @@ pub fn step(
         if beyond == Wall {
             return GameUpdate::Error("Cannot push block into wall".to_string());
         }
-        if game.boxes.contains(&new_box_pos) {
+        if game.environment.boxes.contains(&new_box_pos) {
             return GameUpdate::Error("Cannot push block into another block".to_string());
         }
 
@@ -55,7 +55,9 @@ pub fn step(
     GameUpdate::NextState(
         GameState {
             player: dest_pos,
-            boxes: new_boxes,
+            environment: GameStateEnvironment {
+                boxes: new_boxes,
+            },
         },
         if pushing.is_some() {
             GameChangeType::PlayerAndBoxMove
