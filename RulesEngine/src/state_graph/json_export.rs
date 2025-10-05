@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 struct JsonData {
     nodes: Vec<JsonNode>,
-    edges: Vec<JsonEdge>,
+    links: Vec<JsonEdge>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -69,7 +69,7 @@ pub fn get_json_data(graph: &StateGraph, shared: &SharedGameState) -> String {
         })
         .collect();
 
-    let edges: Vec<JsonEdge> = graph
+    let links: Vec<JsonEdge> = graph
         .edges
         .iter()
         .map(|edge| {
@@ -83,6 +83,6 @@ pub fn get_json_data(graph: &StateGraph, shared: &SharedGameState) -> String {
         })
         .collect();
 
-    let json_data = JsonData { nodes, edges };
+    let json_data = JsonData { nodes, links };
     serde_json::to_string_pretty(&json_data).unwrap()
 }

@@ -1,7 +1,7 @@
 <head>
   <style> body { margin: 0; } </style>
 
-  <script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
   <!--<script src="../../dist/force-graph.js"></script>-->
 </head>
 
@@ -10,39 +10,39 @@
 
   <script>
     var data = {
-        "nodes": [
-            {
+  "nodes": [
+    {
                 "id": 1,
-                "on_targets": 0
-            },
-            {
-                "id": 2,
-                "on_targets": 0
-            },
-            {
+      "on_targets": 0
+    },
+    {
+      "id": 2,
+      "on_targets": 0
+    },
+    {
                 "id": 3,
-                "on_targets": 1
-            }
-        ],
-        "links": [
-            {
-                "source": 1,
-                "target": 2,
-                "dir": "Down",
-                "change_type": "PlayerMove"
-            },
-            {
-                "source": 2,
+      "on_targets": 1
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "target": 2,
+      "dir": "Down",
+      "change_type": "PlayerMove"
+    },
+    {
+      "source": 2,
                 "target": 3,
-                "dir": "Left",
-                "change_type": "PlayerAndBoxMove"
-            }
-        ]
-    };
+      "dir": "Left",
+      "change_type": "PlayerAndBoxMove"
+    }
+  ]
+};
 
     window.onload = function() {
         console.log("loaded");
-        const Graph = new ForceGraph(document.getElementById('graph'))
+        const Graph = new ForceGraph3D(document.getElementById('graph'))
             .graphData(data)
             .nodeId('id')
             .nodeVal('on_targets')
@@ -52,6 +52,7 @@
             .linkTarget('target')
             .linkAutoColorBy('change_type')
             .linkLabel((link) => `${link.change_type} ${link.dir}`)
+            .linkVisibility((link) => link.change_type === "PlayerAndBoxMove")
             .linkDirectionalArrowLength(3.5)
             .linkDirectionalArrowRelPos(1)
             .linkDirectionalParticles(0.5);
