@@ -1,3 +1,5 @@
+mod spatial_hash;
+
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use crate::state_graph::StateGraph;
@@ -6,6 +8,7 @@ use rand::Rng;
 use std::collections::HashMap;
 use bevy::mesh::ConeAnchor;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use crate::bevy_interface::spatial_hash::SpatialHash;
 
 #[derive(Component)]
 struct GraphNode {
@@ -31,6 +34,11 @@ struct PhysicsConfig {
     attraction_strength: f32,
     damping: f32,
     max_velocity: f32,
+    desired_distance: f32,
+    max_repel_force: f32,
+    use_center_repellent: bool,
+    spatial_hash_size: f32,
+    use_spatial_hash: bool,
 }
 
 #[derive(Component)]
@@ -56,6 +64,11 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             attraction_strength: 2.0,
             damping: 0.95,
             max_velocity: 10.0,
+            desired_distance: 50.0,
+            max_repel_force: 15.0,
+            use_center_repellent: true,
+            spatial_hash_size: 5.0,
+            use_spatial_hash: false,
         })
         .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_compute_cache, setup_fps_counter).chain())
         .add_systems(Update, (apply_forces, update_edges, update_fps_counter))
@@ -263,17 +276,44 @@ fn apply_forces(
         nodes_data.push((node.id, transform.translation));
     }
 
+    let mut spatial_hash: SpatialHash<(usize, Vec3)> = SpatialHash::new(physics.spatial_hash_size);
+    for &(id, pos) in &nodes_data {
+        spatial_hash.insert(pos, (id, pos));
+    }
+
     for (mut transform, mut node) in node_query.iter_mut() {
         let mut force = Vec3::ZERO;
         let current_pos = transform.translation;
 
-        for &(other_id, other_pos) in &nodes_data {
-            if node.id == other_id { continue; }
+        if physics.use_spatial_hash {
+            for &(other_id, other_pos) in spatial_hash.iter_all_nearby(current_pos) {
+                if node.id == other_id { continue; }
 
-            let diff = current_pos - other_pos;
-            let distance = diff.length().max(0.1);
-            let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-            force += repulsion;
+                let diff = current_pos - other_pos;
+                let distance = diff.length().max(0.1);
+                let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
+                force += repulsion;
+            }
+        } else {
+            for &(other_id, other_pos) in nodes_data.iter() {
+                if node.id == other_id { continue; }
+
+                let diff = current_pos - other_pos;
+                let distance = diff.length().max(0.1);
+                let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
+                force += repulsion;
+            }
+        }
+
+        if physics.use_center_repellent {
+            let center_position = Vec3::ZERO;
+            let to_center = center_position - current_pos;
+            let distance_to_center = to_center.length();
+
+            let attraction_factor = (distance_to_center - physics.desired_distance) / physics.desired_distance;
+            let attraction_magnitude = attraction_factor * physics.max_repel_force;
+            let attraction_to_center = to_center.normalize() * attraction_magnitude;
+            force += attraction_to_center;
         }
 
         if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
@@ -286,7 +326,7 @@ fn apply_forces(
                 }
             }
         }
-        
+
         // Apply damping
         node.velocity *= physics.damping;
         
@@ -300,7 +340,7 @@ fn apply_forces(
         
         // Update position
         transform.translation += node.velocity * dt;
-        
+
         // Update node positions resource
         node_positions.positions.insert(node.id, transform.translation);
     }
