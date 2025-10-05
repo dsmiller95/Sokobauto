@@ -1,14 +1,14 @@
-interface GraphData {
+export interface GraphData {
     nodes: GraphNode[];
     links: GraphLink[];
 }
 
-interface GraphNode {
+export interface GraphNode {
     id: number;
     on_targets: number;
 }
 
-interface GraphLink {
+export interface GraphLink {
     source: number;
     target: number;
 }

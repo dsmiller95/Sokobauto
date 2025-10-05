@@ -1,24 +1,17 @@
 import { Graph, GraphConfigInterface } from "@cosmos.gl/graph";
 import React from "react";
+import { getColorsByMaxTargets } from "../helpers";
+import { GraphData } from "../models";
 
 interface Props {
-    data: GraphData;
+  data: GraphData;
 }
 
 const spaceSize = 8192;
 
-const minColor = [117/255, 70/255, 63/255, 255/255];
-const maxColor = [7/255, 14/255, 227/255, 255/255];
-
 function applyGraphData(graph: Graph, data: GraphData) {
   const maxOnTargets = Math.max(...data.nodes.map(n => n.on_targets));
-  const colorsByTargets = Array(maxOnTargets + 1).fill(0).map((_, i) => {
-    const t = maxOnTargets === 0 ? 0 : i / maxOnTargets;
-    return minColor.map((minC, index) => {
-      const maxC = maxColor[index];
-      return minC * (1 - t) + maxC * t;
-    });
-  });
+  const colorsByTargets = getColorsByMaxTargets(maxOnTargets);
   
 
   const idToIndex: Record<number, number> = {};
@@ -41,7 +34,7 @@ function applyGraphData(graph: Graph, data: GraphData) {
     const sourceIndex = idToIndex[link.source];
     const targetIndex = idToIndex[link.target];
     if (sourceIndex === undefined || targetIndex === undefined) {
-      console.warn(`Link with unknown source or target: ${link.source} -> ${link.target}`);
+      console.warn(`Link with unknown source or target: ${link.source} -> ${link.target}`, link);
       continue;
     }
 
@@ -86,10 +79,16 @@ const CosmosGraph = ({data}: Props) => {
   React.useEffect(() => {
     if (!divRef.current) return;
     if (graphRef.current) return;
+
     graphRef.current = createGraph(divRef.current);
     applyGraphData(graphRef.current, data);
     graphRef.current.render();
-  }, [divRef.current]);
+
+    return () => {
+      graphRef.current?.destroy();
+      graphRef.current = null;
+    };
+  }, [divRef.current, data]);
 
   return <div ref={divRef}></div>;
 };
