@@ -37,9 +37,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ########
 # @$  .#
 # $  $ #
-# .#  ##
-# .####
-#######
+# .# $ #
+#..#   #
+########
 "#;
 
     let (game_state, shared) = parse_level(level);
