@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import {
   Zap,
@@ -10,7 +10,11 @@ import {
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
-  component: App,
+  beforeLoad: () => {
+    throw redirect({
+      to: '/graph/view'
+    })
+  }
 })
 
 function App() {
