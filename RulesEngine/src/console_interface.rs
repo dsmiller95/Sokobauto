@@ -18,14 +18,14 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
     let mut player = Vec2 { i: 0, j: 0 };
     let mut boxes: Vec<Vec2> = Vec::new();
     let max_width = s.lines().map(|line| line.len()).max().unwrap_or(0);
-    
+
     let mut i = 0;
     for line in s.lines() {
-        let line = line.trim();
+        let line = line.trim_matches('\n');
         if line.len() == 0 {
             continue;
         }
-        
+
         let mut row = Vec::new();
         for (j, ch) in line.chars().enumerate() {
             let c = match ch {
