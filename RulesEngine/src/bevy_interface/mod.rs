@@ -134,8 +134,20 @@ fn setup_graph_from_data(
 ) {
     let mut rng = rand::thread_rng();
     let mut node_positions = HashMap::new();
-    
-    // Create nodes
+
+    let node_mesh = meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap());
+
+    let node_materials = (0..=graph_data.max_on_targets).map(|on_targets| {
+        let color = interpolate_color(on_targets, graph_data.max_on_targets);
+        materials.add(StandardMaterial {
+            base_color: color,
+            metallic: 0.3,
+            perceptual_roughness: 0.4,
+            ..default()
+        })
+    })
+        .collect::<Vec<_>>();
+
     for node_data in &graph_data.nodes {
         let position = Vec3::new(
             rng.gen_range(-15.0..15.0),
@@ -143,17 +155,9 @@ fn setup_graph_from_data(
             rng.gen_range(-15.0..15.0),
         );
         
-        let color = interpolate_color(node_data.on_targets, graph_data.max_on_targets);
-        
         commands.spawn((
-            // TODO: share mesh and materials?
-            Mesh3d(meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap())),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color,
-                metallic: 0.3,
-                perceptual_roughness: 0.4,
-                ..default()
-            })),
+            Mesh3d(node_mesh.clone()),
+            MeshMaterial3d(node_materials[node_data.on_targets].clone()),
             Transform::from_translation(position),
             GraphNode {
                 id: node_data.id,
@@ -164,8 +168,15 @@ fn setup_graph_from_data(
         
         node_positions.insert(node_data.id, position);
     }
-    
-    // Create edges
+
+    let edge_mesh = meshes.add(Capsule3d::new(0.1, 1.0));
+    let edge_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.7, 0.7, 0.7),
+        metallic: 0.1,
+        perceptual_roughness: 0.8,
+        ..default()
+    });
+
     for edge in graph_data.edges.iter() {
         let from_id = edge.from;
         let to_id = edge.to;
@@ -173,19 +184,12 @@ fn setup_graph_from_data(
             node_positions.get(&from_id),
             node_positions.get(&to_id),
         ) {
-            let center = (from_pos + to_pos) / 2.0;
-
             let mut transform = Transform::default();
             set_edge_transform(&mut transform, from_pos, to_pos);
 
             commands.spawn((
-                Mesh3d(meshes.add(Capsule3d::new(0.1, 1.0))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.7, 0.7, 0.7),
-                    metallic: 0.1,
-                    perceptual_roughness: 0.8,
-                    ..default()
-                })),
+                Mesh3d(edge_mesh.clone()),
+                MeshMaterial3d(edge_material.clone()),
                 transform,
                 GraphEdge {
                     from_id,
