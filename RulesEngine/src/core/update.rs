@@ -45,6 +45,7 @@ pub fn step(
         }
 
         new_boxes[pushed_box_index] = new_box_pos;
+        new_boxes.sort()
     } else {
         if dest == Wall {
             return GameUpdate::Error("Cannot walk into a wall".to_string());

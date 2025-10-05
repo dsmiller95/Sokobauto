@@ -6,6 +6,7 @@ pub enum Cell {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialOrd, Ord)]
 pub struct Vec2 {
     pub i: i32,
     pub j: i32,
