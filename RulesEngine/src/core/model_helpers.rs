@@ -1,9 +1,9 @@
-use crate::core::{Cell, GameState, UserAction};
+use crate::core::{Cell, GameState, SharedGameState, UserAction};
 use crate::models::Vec2;
 
 impl GameState {
-    pub fn is_won(&self) -> bool {
-        for (i, row) in self.grid.iter().enumerate() {
+    pub fn is_won(&self, shared: &SharedGameState) -> bool {
+        for (i, row) in shared.grid.iter().enumerate() {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
                     let pos = Vec2 { i: i as i32, j: j as i32 };
@@ -16,9 +16,9 @@ impl GameState {
         true
     }
 
-    pub fn count_boxes_on_goals(&self) -> usize {
+    pub fn count_boxes_on_goals(&self, shared: &SharedGameState) -> usize {
         let mut count = 0;
-        for (i, row) in self.grid.iter().enumerate() {
+        for (i, row) in shared.grid.iter().enumerate() {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
                     let pos = Vec2 { i: i as i32, j: j as i32 };
@@ -30,7 +30,9 @@ impl GameState {
         }
         count
     }
+}
 
+impl SharedGameState {
     pub fn height(&self) -> i32 {
         self.grid.len() as i32
     }

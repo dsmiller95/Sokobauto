@@ -1,15 +1,17 @@
 use std::ops::IndexMut;
 use crate::core::Cell::{Floor, Target, Wall};
-use crate::core::{Direction, GameChangeType, GameState, GameUpdate, UserAction, Vec2};
+use crate::core::{Direction, GameChangeType, GameState, GameUpdate, SharedGameState, UserAction, Vec2};
 
-pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
-    let h = game.height();
-    let w = game.width();
+pub fn step(
+    shared: &SharedGameState,
+    game: &GameState,
+    action: UserAction) -> GameUpdate {
+    let h = shared.height();
+    let w = shared.width();
 
     let dir = match action {
         UserAction::Move(d) => vec_from_dir(d),
     };
-
 
     let ni = game.player.i + dir.i;
     let nj = game.player.j + dir.j;
@@ -21,8 +23,8 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
         return GameUpdate::Error("Cannot move out of bounds".to_string());
     }
 
-    let dest = game.grid[ni as usize][nj as usize];
-    
+    let dest = shared.grid[ni as usize][nj as usize];
+
     let pushing = game.boxes.iter().position(|&x| x == dest_pos);
     let mut new_boxes = game.boxes.clone();
     if let Some(pushed_box_index) = pushing {
@@ -35,7 +37,7 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
         if bi < 0 || bj < 0 || bi >= h || bj >= w {
             return GameUpdate::Error("Cannot push block out of bounds".to_string());
         }
-        let beyond = game.grid[bi as usize][bj as usize];
+        let beyond = shared.grid[bi as usize][bj as usize];
         if beyond == Wall {
             return GameUpdate::Error("Cannot push block into wall".to_string());
         }
@@ -45,15 +47,13 @@ pub fn step(game: &GameState, action: UserAction) -> GameUpdate {
 
         new_boxes[pushed_box_index] = new_box_pos;
     } else {
-        if !(dest == Floor || dest == Target) {
+        if dest == Wall {
             return GameUpdate::Error("Cannot walk into a wall".to_string());
         }
     }
 
     GameUpdate::NextState(
         GameState {
-            // TODO: don't clone
-            grid: game.grid.clone(),
             player: dest_pos,
             boxes: new_boxes,
         },

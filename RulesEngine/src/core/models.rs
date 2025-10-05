@@ -24,9 +24,12 @@ pub enum UserAction {
     Move(Direction),
 }
 
+pub struct SharedGameState {
+    pub grid: Vec<Vec<Cell>>,
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GameState {
-    pub grid: Vec<Vec<Cell>>,
     pub boxes: Vec<Vec2>,
     pub player: Vec2,
 }

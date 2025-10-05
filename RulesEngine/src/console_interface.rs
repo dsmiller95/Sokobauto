@@ -1,4 +1,4 @@
-use crate::core::{Direction, GameState, UserAction};
+use crate::core::{Direction, GameState, SharedGameState, UserAction};
 use crate::models::Cell::{
     Floor, Target, Wall,
 };
@@ -13,7 +13,7 @@ use ratatui::{
 };
 use std::io;
 
-pub fn parse_level(s: &str) -> GameState {
+pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
     let mut grid: Vec<Vec<Cell>> = Vec::new();
     let mut player = Vec2 { i: 0, j: 0 };
     let mut boxes: Vec<Vec2> = Vec::new();
@@ -64,11 +64,15 @@ pub fn parse_level(s: &str) -> GameState {
         grid.push(row);
     }
 
-    GameState {
-        grid,
-        player,
-        boxes
-    }
+    (
+        GameState {
+            player,
+            boxes
+        },
+        SharedGameState {
+            grid,
+        }
+    )
 }
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn std::error::Error>>
@@ -88,6 +92,7 @@ pub fn cleanup_terminal() -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn render_game(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    shared: &SharedGameState,
     state: &GameRenderState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|f| {
@@ -97,7 +102,7 @@ pub fn render_game(
             .split(f.area());
 
         // Game area
-        let game_text = render_grid_to_string(&state.game);
+        let game_text = render_game_to_string(shared, &state.game);
         let game_paragraph = Paragraph::new(game_text)
             .block(Block::default().borders(Borders::ALL).title("Sokoban"))
             .style(Style::default().fg(Color::White))
@@ -132,9 +137,9 @@ pub fn render_game(
     Ok(())
 }
 
-fn render_grid_to_string(game: &GameState) -> String {
+fn render_game_to_string(shared: &SharedGameState, game: &GameState) -> String {
     let mut result = String::new();
-    for (i, row) in game.grid.iter().enumerate() {
+    for (i, row) in shared.grid.iter().enumerate() {
         for (j, c) in row.iter().enumerate() {
             let pos = Vec2 {
                 i: i as i32,

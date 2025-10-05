@@ -1,8 +1,8 @@
-use crate::core::{GameUpdate, UserAction, step};
+use crate::core::{GameUpdate, UserAction, step, SharedGameState};
 use crate::state_graph::Edge;
 use crate::state_graph::models::{NodeState, PopulateResult, StateGraph};
 
-pub fn populate_node(graph: &mut StateGraph, from_id: usize) {
+pub fn populate_node(graph: &mut StateGraph, from_id: usize, shared: &SharedGameState) {
     let Some(from_state) = graph.get_state(from_id) else {
         return;
     };
@@ -10,7 +10,7 @@ pub fn populate_node(graph: &mut StateGraph, from_id: usize) {
 
     let actions = UserAction::all_actions();
     for action in actions {
-        let update = step(&from_state, action.clone());
+        let update = step(shared, &from_state, action.clone());
         if let GameUpdate::NextState(new_state, change_type) = update {
             let to_id = graph.upsert_state(new_state);
             let edge = Edge {
@@ -26,13 +26,13 @@ pub fn populate_node(graph: &mut StateGraph, from_id: usize) {
     graph.mark_visited(from_id);
 }
 
-pub fn populate_step(graph: &mut StateGraph) -> PopulateResult {
+pub fn populate_step(graph: &mut StateGraph, shared: &SharedGameState) -> PopulateResult {
     let picked_node = graph.get_unvisited_node();
 
     let Some(node_id) = picked_node else {
         graph.assert_all_visited();
         return PopulateResult::AllVisited;
     };
-    populate_node(graph, node_id);
+    populate_node(graph, node_id, shared);
     PopulateResult::Populated
 }

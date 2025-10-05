@@ -1,4 +1,4 @@
-use crate::core::{Cell, UserAction};
+use crate::core::{Cell, SharedGameState, UserAction};
 use crate::state_graph::StateGraph;
 use serde::{Deserialize, Serialize};
 
@@ -56,12 +56,12 @@ impl From<crate::core::GameChangeType> for JsonEdgeType {
     }
 }
 
-pub fn get_json_data(graph: &StateGraph) -> String {
+pub fn get_json_data(graph: &StateGraph, shared: &SharedGameState) -> String {
     let nodes: Vec<JsonNode> = graph
         .nodes
         .iter()
         .map(|(state, id)| {
-            let on_targets = state.count_boxes_on_goals();
+            let on_targets = state.count_boxes_on_goals(shared);
             JsonNode {
                 id: *id,
                 on_targets,
