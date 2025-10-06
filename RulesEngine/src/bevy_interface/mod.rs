@@ -36,7 +36,6 @@ struct PhysicsConfig {
     max_velocity: f32,
     desired_distance: f32,
     max_repel_force: f32,
-    use_center_repellent: bool,
     spatial_hash_size: f32,
     use_spatial_hash: bool,
 }
@@ -66,7 +65,6 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             max_velocity: 10.0,
             desired_distance: 50.0,
             max_repel_force: 15.0,
-            use_center_repellent: true,
             spatial_hash_size: 5.0,
             use_spatial_hash: false,
         })
@@ -303,17 +301,6 @@ fn apply_forces(
                 let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
                 force += repulsion;
             }
-        }
-
-        if physics.use_center_repellent {
-            let center_position = Vec3::ZERO;
-            let to_center = center_position - current_pos;
-            let distance_to_center = to_center.length();
-
-            let attraction_factor = (distance_to_center - physics.desired_distance) / physics.desired_distance;
-            let attraction_magnitude = attraction_factor * physics.max_repel_force;
-            let attraction_to_center = to_center.normalize() * attraction_magnitude;
-            force += attraction_to_center;
         }
 
         if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
