@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use bevy::mesh::ConeAnchor;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use crate::bevy_interface::spatial_hash::SpatialHash;
-use crate::bevy_interface::octree::Octree;
+use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode};
 
 #[derive(Component)]
 struct GraphNode {
@@ -52,6 +52,43 @@ struct PhysicsConfig {
 #[derive(Component)]
 struct FpsText;
 
+#[derive(Component)]
+struct OctreeBounds {
+    depth: usize,
+}
+
+#[derive(Component)]
+struct OctreeCenterOfMass {
+    depth: usize,
+}
+
+#[derive(Resource)]
+struct OctreeVisualizationConfig {
+    show_octree_bounds: bool,
+    show_center_of_mass: bool,
+    max_depth_to_show: usize,
+    min_mass_to_show: f32,
+}
+
+impl Default for OctreeVisualizationConfig {
+    fn default() -> Self {
+        Self {
+            show_octree_bounds: true,
+            show_center_of_mass: true,
+            max_depth_to_show: 8,
+            min_mass_to_show: 1.0,
+        }
+    }
+}
+
+#[derive(Resource)]
+struct OctreeVisualizationMeshes {
+    bounds_mesh: Handle<Mesh>,
+    center_of_mass_mesh: Handle<Mesh>,
+    bounds_materials: Vec<Handle<StandardMaterial>>,
+    center_of_mass_materials: Vec<Handle<StandardMaterial>>,
+}
+
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
     let graph_data = GraphData::from_state_graph(graph, shared);
 
@@ -67,6 +104,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(graph_data)
+        .insert_resource(OctreeVisualizationConfig::default())
         .insert_resource(PhysicsConfig {
             repulsion_strength: 50.0,
             attraction_strength: 2.0,
@@ -82,8 +120,8 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             octree_max_depth: 8, // Should handle 50k nodes well
             octree_max_points_per_leaf: 16, // Reasonable leaf size
         })
-        .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_compute_cache, setup_fps_counter).chain())
-        .add_systems(Update, (apply_forces, update_edges, update_fps_counter))
+        .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_compute_cache, setup_fps_counter, setup_octree_visualization).chain())
+        .add_systems(Update, (apply_forces, update_edges, update_fps_counter, update_octree_visualization))
         .run();
 }
 
@@ -477,4 +515,159 @@ fn update_fps_counter(
     let Some(fps_diagnostic) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) else { return };
     let Some(fps_smoothed) = fps_diagnostic.smoothed() else { return };
     text.0 = format!("FPS: {:.1}", fps_smoothed);
+}
+
+fn setup_octree_visualization(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Create wireframe cube mesh for bounds visualization
+    let bounds_mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let center_of_mass_mesh = meshes.add(Cuboid::new(0.5, 0.5, 0.5));
+
+    // Create materials for different depths (up to 10 levels)
+    let bounds_materials: Vec<Handle<StandardMaterial>> = (0..10)
+        .map(|depth| {
+            let hue = (depth as f32 * 40.0) % 360.0; // Different hue for each depth
+            let color = Color::hsl(hue, 0.8, 0.6);
+            materials.add(StandardMaterial {
+                base_color: color.with_alpha(0.3), // Semi-transparent wireframe
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            })
+        })
+        .collect();
+
+    let center_of_mass_materials: Vec<Handle<StandardMaterial>> = (0..10)
+        .map(|depth| {
+            let hue = (depth as f32 * 40.0 + 180.0) % 360.0; // Offset hue for center of mass
+            let color = Color::hsl(hue, 1.0, 0.5);
+            materials.add(StandardMaterial {
+                base_color: color,
+                unlit: true,
+                ..default()
+            })
+        })
+        .collect();
+
+    commands.insert_resource(OctreeVisualizationMeshes {
+        bounds_mesh,
+        center_of_mass_mesh,
+        bounds_materials,
+        center_of_mass_materials,
+    });
+}
+
+fn update_octree_visualization(
+    mut commands: Commands,
+    node_query: Query<&Transform, (With<GraphNode>, Without<OctreeBounds>, Without<OctreeCenterOfMass>)>,
+    mut bounds_query: Query<(Entity, &mut Transform, &OctreeBounds), (Without<GraphNode>, Without<OctreeCenterOfMass>)>,
+    mut center_query: Query<(Entity, &mut Transform, &OctreeCenterOfMass), (Without<GraphNode>, Without<OctreeBounds>)>,
+    physics: Res<PhysicsConfig>,
+    visualization_config: Res<OctreeVisualizationConfig>,
+    visualization_meshes: Res<OctreeVisualizationMeshes>,
+    time: Res<Time>,
+) {
+    // Skip if not using octree or if simulation stopped
+    if !physics.use_octree || time.elapsed().as_secs_f32() > 60.0 {
+        return;
+    }
+
+    // Collect all node positions
+    let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
+        .enumerate()
+        .map(|(i, transform)| (i, transform.translation))
+        .collect();
+
+    if nodes_data.is_empty() {
+        return;
+    }
+
+    // Build octree to get visualization data
+    let octree = Octree::from_points(
+        &nodes_data,
+        physics.octree_max_depth,
+        physics.octree_max_points_per_leaf,
+    );
+
+    let visualization_data = octree.get_visualization_data();
+
+    // Filter visualization data based on config
+    let filtered_bounds: Vec<&OctreeVisualizationNode> = visualization_data.iter()
+        .filter(|node| {
+            visualization_config.show_octree_bounds
+                && node.depth <= visualization_config.max_depth_to_show
+                && node.total_mass >= visualization_config.min_mass_to_show
+        })
+        .collect();
+
+    let filtered_centers: Vec<&OctreeVisualizationNode> = visualization_data.iter()
+        .filter(|node| {
+            visualization_config.show_center_of_mass
+                && node.depth <= visualization_config.max_depth_to_show
+                && node.total_mass >= visualization_config.min_mass_to_show
+        })
+        .collect();
+
+    // Update bounds visualization
+    update_visualization_entities(
+        &mut commands,
+        bounds_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
+        &filtered_bounds,
+        &visualization_meshes.bounds_mesh,
+        &visualization_meshes.bounds_materials,
+        |node| (node.bounds.center(), node.bounds.size(), node.depth),
+        |depth| OctreeBounds { depth },
+    );
+
+    // Update center of mass visualization
+    update_visualization_entities(
+        &mut commands,
+        center_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
+        &filtered_centers,
+        &visualization_meshes.center_of_mass_mesh,
+        &visualization_meshes.center_of_mass_materials,
+        |node| {
+            let size = (node.total_mass * 0.1).clamp(0.2, 2.0); // Scale based on mass
+            (node.center_of_mass, Vec3::splat(size), node.depth)
+        },
+        |depth| OctreeCenterOfMass { depth },
+    );
+}
+
+fn update_visualization_entities<C: Component>(
+    commands: &mut Commands,
+    mut existing_entities: Vec<(Entity, Mut<Transform>, usize)>,
+    new_data: &[&OctreeVisualizationNode],
+    mesh: &Handle<Mesh>,
+    materials: &[Handle<StandardMaterial>],
+    extract_transform_data: impl Fn(&OctreeVisualizationNode) -> (Vec3, Vec3, usize),
+    create_component: impl Fn(usize) -> C,
+) {
+    // Update existing entities
+    for (i, data) in new_data.iter().enumerate() {
+        let (position, scale, depth) = extract_transform_data(data);
+        
+        if let Some((_, transform, _)) = existing_entities.get_mut(i) {
+            // Reuse existing entity
+            transform.translation = position;
+            transform.scale = scale;
+        } else {
+            // Spawn new entity
+            let material_index = depth.min(materials.len() - 1);
+            commands.spawn((
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(materials[material_index].clone()),
+                Transform::from_translation(position).with_scale(scale),
+                create_component(depth),
+            ));
+        }
+    }
+
+    // Despawn excess entities
+    for (entity, _, _) in existing_entities.iter().skip(new_data.len()) {
+        commands.entity(*entity).despawn();
+    }
 }

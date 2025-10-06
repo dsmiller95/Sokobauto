@@ -250,6 +250,41 @@ impl Octree {
             }
         }
     }
+
+    pub fn get_visualization_data(&self) -> Vec<OctreeVisualizationNode> {
+        let mut data = Vec::new();
+        self.collect_visualization_recursive(&self.root, 0, &mut data);
+        data
+    }
+
+    fn collect_visualization_recursive(&self, node: &OctreeNode, depth: usize, data: &mut Vec<OctreeVisualizationNode>) {
+        if node.node_count == 0 {
+            return;
+        }
+
+        data.push(OctreeVisualizationNode {
+            bounds: node.bounds,
+            center_of_mass: node.center_of_mass,
+            total_mass: node.total_mass,
+            depth,
+            is_leaf: node.is_leaf(),
+        });
+
+        if let Some(ref children) = node.children {
+            for child in children.iter() {
+                self.collect_visualization_recursive(child, depth + 1, data);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OctreeVisualizationNode {
+    pub bounds: Bounds,
+    pub center_of_mass: Vec3,
+    pub total_mass: f32,
+    pub depth: usize,
+    pub is_leaf: bool,
 }
 
 #[cfg(test)]
@@ -481,5 +516,32 @@ mod tests {
         // The direction should be roughly the same
         let dot_product = force_low_theta.normalize().dot(force_high_theta.normalize());
         assert!(dot_product > 0.9); // Vectors should be pointing in similar directions
+    }
+
+    #[test]
+    fn test_visualization_data() {
+        let points = vec![
+            (0, Vec3::new(1.0, 1.0, 1.0)),
+            (1, Vec3::new(9.0, 9.0, 9.0)),
+            (2, Vec3::new(5.0, 5.0, 5.0)),
+        ];
+        
+        let octree = Octree::from_points(&points, 3, 1);
+        let viz_data = octree.get_visualization_data();
+        
+        // Should have at least the root node
+        assert!(!viz_data.is_empty());
+        
+        // Check that we have visualization data with proper structure
+        let root_node = &viz_data[0];
+        assert_eq!(root_node.depth, 0);
+        assert_eq!(root_node.total_mass, 3.0);
+        assert!(root_node.bounds.contains(Vec3::new(1.0, 1.0, 1.0)));
+        assert!(root_node.bounds.contains(Vec3::new(9.0, 9.0, 9.0)));
+        assert!(root_node.bounds.contains(Vec3::new(5.0, 5.0, 5.0)));
+        
+        // Should have child nodes since points are spread out
+        let child_nodes: Vec<_> = viz_data.iter().filter(|node| node.depth > 0).collect();
+        assert!(!child_nodes.is_empty());
     }
 }
