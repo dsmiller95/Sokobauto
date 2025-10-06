@@ -9,6 +9,7 @@ use rand::Rng;
 use std::collections::HashMap;
 use bevy::mesh::ConeAnchor;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use crate::bevy_interface::spatial_hash::SpatialHash;
 use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode};
 
@@ -85,8 +86,8 @@ impl Default for OctreeVisualizationConfig {
 struct OctreeVisualizationMeshes {
     bounds_mesh: Handle<Mesh>,
     center_of_mass_mesh: Handle<Mesh>,
-    bounds_materials: Vec<Handle<StandardMaterial>>,
-    center_of_mass_materials: Vec<Handle<StandardMaterial>>,
+    bounds_material: Handle<StandardMaterial>,
+    center_of_mass_material: Handle<StandardMaterial>,
 }
 
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
@@ -102,6 +103,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             ..default()
         }))
         .add_plugins(PanOrbitCameraPlugin)
+        .add_plugins(WireframePlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(graph_data)
         .insert_resource(OctreeVisualizationConfig::default())
@@ -523,40 +525,28 @@ fn setup_octree_visualization(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Create wireframe cube mesh for bounds visualization
-    let bounds_mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-    let center_of_mass_mesh = meshes.add(Cuboid::new(0.5, 0.5, 0.5));
+    let bounds_mesh = meshes.add(Cuboid::new(0.99, 0.99, 0.99));
+    let center_of_mass_mesh = meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap());
 
     // Create materials for different depths (up to 10 levels)
-    let bounds_materials: Vec<Handle<StandardMaterial>> = (0..10)
-        .map(|depth| {
-            let hue = (depth as f32 * 40.0) % 360.0; // Different hue for each depth
-            let color = Color::hsl(hue, 0.8, 0.6);
-            materials.add(StandardMaterial {
-                base_color: color.with_alpha(0.3), // Semi-transparent wireframe
-                alpha_mode: AlphaMode::Blend,
-                unlit: true,
-                ..default()
-            })
-        })
-        .collect();
+    let bounds_material = materials.add(StandardMaterial {
+        base_color: Color::hsl(10.0, 0.3, 0.0).with_alpha(0.0), // Semi-transparent wireframe
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..default()
+    });
 
-    let center_of_mass_materials: Vec<Handle<StandardMaterial>> = (0..10)
-        .map(|depth| {
-            let hue = (depth as f32 * 40.0 + 180.0) % 360.0; // Offset hue for center of mass
-            let color = Color::hsl(hue, 1.0, 0.5);
-            materials.add(StandardMaterial {
-                base_color: color,
-                unlit: true,
-                ..default()
-            })
-        })
-        .collect();
+    let center_of_mass_material = materials.add(StandardMaterial {
+        base_color: Color::hsl(190.0, 1.0, 0.5),
+        unlit: true,
+        ..default()
+    });
 
     commands.insert_resource(OctreeVisualizationMeshes {
         bounds_mesh,
         center_of_mass_mesh,
-        bounds_materials,
-        center_of_mass_materials,
+        bounds_material,
+        center_of_mass_material,
     });
 }
 
@@ -616,10 +606,13 @@ fn update_octree_visualization(
         &mut commands,
         bounds_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
         &filtered_bounds,
-        &visualization_meshes.bounds_mesh,
-        &visualization_meshes.bounds_materials,
         |node| (node.bounds.center(), node.bounds.size(), node.depth),
-        |depth| OctreeBounds { depth },
+        |depth| (
+            Mesh3d(visualization_meshes.bounds_mesh.clone()),
+            MeshMaterial3d(visualization_meshes.bounds_material.clone()),
+            Wireframe::default(),
+            OctreeBounds { depth }
+        ),
     );
 
     // Update center of mass visualization
@@ -627,22 +620,23 @@ fn update_octree_visualization(
         &mut commands,
         center_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
         &filtered_centers,
-        &visualization_meshes.center_of_mass_mesh,
-        &visualization_meshes.center_of_mass_materials,
         |node| {
-            let size = (node.total_mass * 0.1).clamp(0.2, 2.0); // Scale based on mass
+            // Scale based on mass, per volume
+            let size = (node.total_mass * 0.1).powf(1.0/3.0).clamp(0.2, 20.0);
             (node.center_of_mass, Vec3::splat(size), node.depth)
         },
-        |depth| OctreeCenterOfMass { depth },
+        |depth| (
+            Mesh3d(visualization_meshes.center_of_mass_mesh.clone()),
+            MeshMaterial3d(visualization_meshes.center_of_mass_material.clone()),
+            OctreeCenterOfMass { depth }
+        ),
     );
 }
 
-fn update_visualization_entities<C: Component>(
+fn update_visualization_entities<C: Bundle>(
     commands: &mut Commands,
     mut existing_entities: Vec<(Entity, Mut<Transform>, usize)>,
     new_data: &[&OctreeVisualizationNode],
-    mesh: &Handle<Mesh>,
-    materials: &[Handle<StandardMaterial>],
     extract_transform_data: impl Fn(&OctreeVisualizationNode) -> (Vec3, Vec3, usize),
     create_component: impl Fn(usize) -> C,
 ) {
@@ -651,15 +645,10 @@ fn update_visualization_entities<C: Component>(
         let (position, scale, depth) = extract_transform_data(data);
         
         if let Some((_, transform, _)) = existing_entities.get_mut(i) {
-            // Reuse existing entity
             transform.translation = position;
             transform.scale = scale;
         } else {
-            // Spawn new entity
-            let material_index = depth.min(materials.len() - 1);
             commands.spawn((
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(materials[material_index].clone()),
                 Transform::from_translation(position).with_scale(scale),
                 create_component(depth),
             ));
