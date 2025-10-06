@@ -5,26 +5,55 @@ use super::OctreeVisualizationConfig;
 #[derive(Component)]
 pub struct ConfigPanel;
 
-#[derive(Component)]
-pub struct OctreeBoundsToggle;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToggleType {
+    OctreeBounds,
+    CenterOfMass,
+    LeafOnly,
+}
+
+impl ToggleType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            ToggleType::OctreeBounds => "Show Octree Bounds",
+            ToggleType::CenterOfMass => "Show Center of Mass",
+            ToggleType::LeafOnly => "Show Leaf Only",
+        }
+    }
+
+    pub fn get_value(&self, config: &OctreeVisualizationConfig) -> bool {
+        match self {
+            ToggleType::OctreeBounds => config.show_octree_bounds,
+            ToggleType::CenterOfMass => config.show_center_of_mass,
+            ToggleType::LeafOnly => config.show_leaf_only,
+        }
+    }
+
+    pub fn set_value(&self, config: &mut OctreeVisualizationConfig, value: bool) {
+        match self {
+            ToggleType::OctreeBounds => config.show_octree_bounds = value,
+            ToggleType::CenterOfMass => config.show_center_of_mass = value,
+            ToggleType::LeafOnly => config.show_leaf_only = value,
+        }
+    }
+
+    pub fn toggle_value(&self, config: &mut OctreeVisualizationConfig) {
+        let current = self.get_value(config);
+        self.set_value(config, !current);
+    }
+}
 
 #[derive(Component)]
-pub struct CenterOfMassToggle;
-
-#[derive(Component)]
-pub struct LeafOnlyToggle;
-
-#[derive(Event)]
-pub struct ToggleOctreeBounds;
+pub struct ConfigToggle {
+    pub toggle_type: ToggleType,
+}
 
 #[derive(Event)]
-pub struct ToggleCenterOfMass;
-
-#[derive(Event)]
-pub struct ToggleLeafOnly;
+pub struct ToggleEvent {
+    pub toggle_type: ToggleType,
+}
 
 const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
-const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
 const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 const ACTIVE_BUTTON: Color = Color::srgb(0.2, 0.6, 0.2);
 
@@ -62,34 +91,16 @@ pub fn setup_config_panel(mut commands: Commands) {
                 },
             ));
 
-            create_toggle_row(
-                parent,
-                "Show Octree Bounds",
-                true,
-                OctreeBoundsToggle,
-            );
-
-            create_toggle_row(
-                parent,
-                "Show Center of Mass",
-                true,
-                CenterOfMassToggle,
-            );
-
-            create_toggle_row(
-                parent,
-                "Show Leaf Only",
-                true,
-                LeafOnlyToggle,
-            );
+            for toggle_type in [ToggleType::OctreeBounds, ToggleType::CenterOfMass, ToggleType::LeafOnly] {
+                create_toggle_row(parent, true, toggle_type);
+            }
         });
 }
 
-fn create_toggle_row<T: Component>(
+fn create_toggle_row(
     parent: &mut RelatedSpawnerCommands<ChildOf>,
-    label: &str,
     initial_state: bool,
-    toggle_component: T,
+    toggle_type: ToggleType,
 ) {
     parent
         .spawn(Node {
@@ -116,7 +127,7 @@ fn create_toggle_row<T: Component>(
                     BackgroundColor(if initial_state { ACTIVE_BUTTON } else { NORMAL_BUTTON }),
                     BorderColor::all(Color::srgb(0.5, 0.5, 0.5)),
                     BorderRadius::all(Val::Px(3.0)),
-                    toggle_component,
+                    ConfigToggle { toggle_type },
                 ))
                 .with_children(|parent| {
                     parent.spawn((
@@ -130,7 +141,7 @@ fn create_toggle_row<T: Component>(
                 });
 
             parent.spawn((
-                Text::new(label),
+                Text::new(toggle_type.label()),
                 TextFont {
                     font_size: 14.0,
                     ..default()
@@ -150,9 +161,7 @@ pub fn handle_toggle_interactions(
             &Interaction,
             &mut BackgroundColor,
             &mut BorderColor,
-            Option<&OctreeBoundsToggle>,
-            Option<&CenterOfMassToggle>,
-            Option<&LeafOnlyToggle>,
+            &ConfigToggle,
             &Children,
         ),
         (Changed<Interaction>, With<Button>),
@@ -161,42 +170,25 @@ pub fn handle_toggle_interactions(
     mut commands: Commands,
     config: Res<OctreeVisualizationConfig>,
 ) {
-    for (interaction, mut color, mut border_color, bounds_toggle, center_toggle, leaf_toggle, children) in
-        interaction_query.iter_mut()
-    {
+    for (interaction, mut color, mut border_color, toggle, children) in interaction_query.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
                 *color = PRESSED_BUTTON.into();
                 *border_color = BorderColor::all(Color::WHITE);
 
-                // Trigger appropriate event
-                if bounds_toggle.is_some() {
-                    commands.trigger(ToggleOctreeBounds);
-                } else if center_toggle.is_some() {
-                    commands.trigger(ToggleCenterOfMass);
-                } else if leaf_toggle.is_some() {
-                    commands.trigger(ToggleLeafOnly);
-                }
+                commands.trigger(ToggleEvent {
+                    toggle_type: toggle.toggle_type,
+                });
             }
             Interaction::Hovered => {
                 *border_color = BorderColor::all(Color::WHITE);
             }
             Interaction::None => {
                 *border_color = BorderColor::all(Color::srgb(0.5, 0.5, 0.5));
-                
-                let is_active = if bounds_toggle.is_some() {
-                    config.show_octree_bounds
-                } else if center_toggle.is_some() {
-                    config.show_center_of_mass
-                } else if leaf_toggle.is_some() {
-                    config.show_leaf_only
-                } else {
-                    false
-                };
 
+                let is_active = toggle.toggle_type.get_value(&config);
                 *color = if is_active { ACTIVE_BUTTON } else { NORMAL_BUTTON }.into();
 
-                // Update checkmark visibility
                 for child in children.iter() {
                     if let Ok(mut text) = text_query.get_mut(child) {
                         text.0 = if is_active { "✓".to_string() } else { "".to_string() };
@@ -207,26 +199,11 @@ pub fn handle_toggle_interactions(
     }
 }
 
-pub fn on_toggle_octree_bounds(
-    _trigger: On<ToggleOctreeBounds>,
+pub fn on_toggle_event(
+    trigger: On<ToggleEvent>,
     mut config: ResMut<OctreeVisualizationConfig>,
 ) {
-    config.show_octree_bounds = !config.show_octree_bounds;
-    println!("Toggled octree bounds: {}", config.show_octree_bounds);
-}
-
-pub fn on_toggle_center_of_mass(
-    _trigger: On<ToggleCenterOfMass>,
-    mut config: ResMut<OctreeVisualizationConfig>,
-) {
-    config.show_center_of_mass = !config.show_center_of_mass;
-    println!("Toggled center of mass: {}", config.show_center_of_mass);
-}
-
-pub fn on_toggle_leaf_only(
-    _trigger: On<ToggleLeafOnly>,
-    mut config: ResMut<OctreeVisualizationConfig>,
-) {
-    config.show_leaf_only = !config.show_leaf_only;
-    println!("Toggled leaf only: {}", config.show_leaf_only);
+    let toggle_type = trigger.event().toggle_type;
+    toggle_type.toggle_value(&mut config);
+    println!("Toggled {:?}: {}", toggle_type, toggle_type.get_value(&config));
 }
