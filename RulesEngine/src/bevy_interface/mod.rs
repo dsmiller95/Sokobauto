@@ -9,6 +9,7 @@ use rand::Rng;
 use std::collections::HashMap;
 use bevy::mesh::ConeAnchor;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::ecs::error::panic;
 use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use crate::bevy_interface::spatial_hash::SpatialHash;
 use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode};
@@ -31,18 +32,23 @@ struct NodePositions {
     positions: HashMap<usize, Vec3>,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum PhysicsMode {
+    Octree,
+    SpatialHash,
+    BruteForce,
+}
+
 #[derive(Resource)]
 struct PhysicsConfig {
     repulsion_strength: f32,
     attraction_strength: f32,
     damping: f32,
     max_velocity: f32,
-    desired_distance: f32,
-    max_repel_force: f32,
+    physics_mode: PhysicsMode,
+    // Spatial hash settings
     spatial_hash_size: f32,
-    use_spatial_hash: bool,
     // Octree settings
-    use_octree: bool,
     // what is the maximum allowed ratio between the size of a node cluster and its distance from the target node
     // smaller values yield more accurate results but are slower
     octree_theta: f32,
@@ -69,7 +75,6 @@ struct OctreeVisualizationConfig {
     show_center_of_mass: bool,
     show_leaf_only: bool,
     max_depth_to_show: usize,
-    min_mass_to_show: f32,
 }
 
 impl Default for OctreeVisualizationConfig {
@@ -79,7 +84,6 @@ impl Default for OctreeVisualizationConfig {
             show_center_of_mass: true,
             show_leaf_only: true,
             max_depth_to_show: 8,
-            min_mass_to_show: 1.0,
         }
     }
 }
@@ -114,12 +118,9 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             attraction_strength: 2.0,
             damping: 0.95,
             max_velocity: 10.0,
-            desired_distance: 50.0,
-            max_repel_force: 15.0,
+            physics_mode: PhysicsMode::Octree,
             spatial_hash_size: 5.0,
-            use_spatial_hash: false,
             // Octree settings - default to octree with good parameters for 10k-50k nodes
-            use_octree: true,
             octree_theta: 0.8, // Good balance between accuracy and performance
             octree_max_depth: 8, // Should handle 50k nodes well
             octree_max_points_per_leaf: 16, // Reasonable leaf size
@@ -325,132 +326,129 @@ fn apply_forces(
 
     let dt = time.delta_secs();
     
-    // Collect all node positions for octree construction
     let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
         .map(|(transform, node)| (node.id, transform.translation))
         .collect();
 
-    // Choose force calculation method based on configuration
-    if physics.use_octree && !nodes_data.is_empty() {
-        // Build octree from current positions
-        let octree = Octree::from_points(
-            &nodes_data,
-            physics.octree_max_depth,
-            physics.octree_max_points_per_leaf,
-        );
+    match physics.physics_mode {
+        PhysicsMode::BruteForce => {
+            for (mut transform, mut node) in node_query.iter_mut() {
+                let mut force = Vec3::ZERO;
+                let current_pos = transform.translation;
 
-        // Apply forces using octree
-        for (mut transform, mut node) in node_query.iter_mut() {
-            let mut force = Vec3::ZERO;
-            let current_pos = transform.translation;
+                for &(other_id, other_pos) in nodes_data.iter() {
+                    if node.id == other_id { continue; }
 
-            // Calculate repulsion using octree (Barnes-Hut algorithm)
-            force += octree.calculate_force(
-                current_pos,
-                physics.octree_theta,
-                physics.repulsion_strength,
+                    let diff = current_pos - other_pos;
+                    let distance = diff.length().max(0.1);
+                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
+                    force += repulsion;
+                }
+
+                if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
+                    for &neighbor_id in neighbors {
+                        if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
+                            let diff = neighbor_pos - current_pos;
+                            let distance = diff.length().max(0.1);
+                            let attraction = diff.normalize() * physics.attraction_strength * distance;
+                            force += attraction;
+                        }
+                    }
+                }
+
+                node.velocity *= physics.damping;
+                node.velocity += force * dt;
+
+                if node.velocity.length() > physics.max_velocity {
+                    node.velocity = node.velocity.normalize() * physics.max_velocity;
+                }
+
+                transform.translation += node.velocity * dt;
+                node_positions.positions.insert(node.id, transform.translation);
+            }
+        }
+        PhysicsMode::SpatialHash => {
+            let mut spatial_hash: SpatialHash<(usize, Vec3)> = SpatialHash::new(physics.spatial_hash_size);
+            for &(id, pos) in &nodes_data {
+                spatial_hash.insert(pos, (id, pos));
+            }
+
+            for (mut transform, mut node) in node_query.iter_mut() {
+                let mut force = Vec3::ZERO;
+                let current_pos = transform.translation;
+
+                for &(other_id, other_pos) in spatial_hash.iter_all_nearby(current_pos) {
+                    if node.id == other_id { continue; }
+
+                    let diff = current_pos - other_pos;
+                    let distance = diff.length().max(0.1);
+                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
+                    force += repulsion;
+                }
+
+                if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
+                    for &neighbor_id in neighbors {
+                        if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
+                            let diff = neighbor_pos - current_pos;
+                            let distance = diff.length().max(0.1);
+                            let attraction = diff.normalize() * physics.attraction_strength * distance;
+                            force += attraction;
+                        }
+                    }
+                }
+
+                node.velocity *= physics.damping;
+                node.velocity += force * dt;
+
+                if node.velocity.length() > physics.max_velocity {
+                    node.velocity = node.velocity.normalize() * physics.max_velocity;
+                }
+
+                transform.translation += node.velocity * dt;
+                node_positions.positions.insert(node.id, transform.translation);
+            }
+        }
+        PhysicsMode::Octree => {
+            let octree = Octree::from_points(
+                &nodes_data,
+                physics.octree_max_depth,
+                physics.octree_max_points_per_leaf,
             );
 
-            // Calculate attraction to neighbors (unchanged)
-            if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-                for &neighbor_id in neighbors {
-                    if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                        let diff = neighbor_pos - current_pos;
-                        let distance = diff.length().max(0.1);
-                        let attraction = diff.normalize() * physics.attraction_strength * distance;
-                        force += attraction;
+            for (mut transform, mut node) in node_query.iter_mut() {
+                let mut force = Vec3::ZERO;
+                let current_pos = transform.translation;
+
+                // Calculate repulsion using octree (Barnes-Hut algorithm)
+                force += octree.calculate_force(
+                    current_pos,
+                    physics.octree_theta,
+                    physics.repulsion_strength,
+                );
+
+                if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
+                    for &neighbor_id in neighbors {
+                        if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
+                            let diff = neighbor_pos - current_pos;
+                            let distance = diff.length().max(0.1);
+                            let attraction = diff.normalize() * physics.attraction_strength * distance;
+                            force += attraction;
+                        }
                     }
                 }
-            }
 
-            // Apply physics integration (unchanged)
-            node.velocity *= physics.damping;
-            node.velocity += force * dt;
-            
-            if node.velocity.length() > physics.max_velocity {
-                node.velocity = node.velocity.normalize() * physics.max_velocity;
-            }
-            
-            transform.translation += node.velocity * dt;
-            node_positions.positions.insert(node.id, transform.translation);
-        }
-    } else if physics.use_spatial_hash {
-        // Original spatial hash implementation
-        let mut spatial_hash: SpatialHash<(usize, Vec3)> = SpatialHash::new(physics.spatial_hash_size);
-        for &(id, pos) in &nodes_data {
-            spatial_hash.insert(pos, (id, pos));
-        }
+                node.velocity *= physics.damping;
+                node.velocity += force * dt;
 
-        for (mut transform, mut node) in node_query.iter_mut() {
-            let mut force = Vec3::ZERO;
-            let current_pos = transform.translation;
-
-            for &(other_id, other_pos) in spatial_hash.iter_all_nearby(current_pos) {
-                if node.id == other_id { continue; }
-
-                let diff = current_pos - other_pos;
-                let distance = diff.length().max(0.1);
-                let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                force += repulsion;
-            }
-
-            if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-                for &neighbor_id in neighbors {
-                    if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                        let diff = neighbor_pos - current_pos;
-                        let distance = diff.length().max(0.1);
-                        let attraction = diff.normalize() * physics.attraction_strength * distance;
-                        force += attraction;
-                    }
+                if node.velocity.length() > physics.max_velocity {
+                    node.velocity = node.velocity.normalize() * physics.max_velocity;
                 }
-            }
 
-            node.velocity *= physics.damping;
-            node.velocity += force * dt;
-            
-            if node.velocity.length() > physics.max_velocity {
-                node.velocity = node.velocity.normalize() * physics.max_velocity;
+                transform.translation += node.velocity * dt;
+                node_positions.positions.insert(node.id, transform.translation);
             }
-            
-            transform.translation += node.velocity * dt;
-            node_positions.positions.insert(node.id, transform.translation);
         }
-    } else {
-        // Original brute force implementation
-        for (mut transform, mut node) in node_query.iter_mut() {
-            let mut force = Vec3::ZERO;
-            let current_pos = transform.translation;
-
-            for &(other_id, other_pos) in nodes_data.iter() {
-                if node.id == other_id { continue; }
-
-                let diff = current_pos - other_pos;
-                let distance = diff.length().max(0.1);
-                let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                force += repulsion;
-            }
-
-            if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-                for &neighbor_id in neighbors {
-                    if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                        let diff = neighbor_pos - current_pos;
-                        let distance = diff.length().max(0.1);
-                        let attraction = diff.normalize() * physics.attraction_strength * distance;
-                        force += attraction;
-                    }
-                }
-            }
-
-            node.velocity *= physics.damping;
-            node.velocity += force * dt;
-            
-            if node.velocity.length() > physics.max_velocity {
-                node.velocity = node.velocity.normalize() * physics.max_velocity;
-            }
-            
-            transform.translation += node.velocity * dt;
-            node_positions.positions.insert(node.id, transform.translation);
-        }
+        _ => panic!("Unknown physics mode"),
     }
 }
 
@@ -526,11 +524,9 @@ fn setup_octree_visualization(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Create wireframe cube mesh for bounds visualization
     let bounds_mesh = meshes.add(Cuboid::new(0.99, 0.99, 0.99));
     let center_of_mass_mesh = meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap());
 
-    // Create materials for different depths (up to 10 levels)
     let bounds_material = materials.add(StandardMaterial {
         base_color: Color::hsl(10.0, 0.3, 0.0).with_alpha(0.0), // Semi-transparent wireframe
         alpha_mode: AlphaMode::Blend,
@@ -562,12 +558,10 @@ fn update_octree_visualization(
     visualization_meshes: Res<OctreeVisualizationMeshes>,
     time: Res<Time>,
 ) {
-    // Skip if not using octree or if simulation stopped
-    if !physics.use_octree || time.elapsed().as_secs_f32() > 60.0 {
+    if physics.physics_mode != PhysicsMode::Octree || time.elapsed().as_secs_f32() > 60.0 {
         return;
     }
 
-    // Collect all node positions
     let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
         .enumerate()
         .map(|(i, transform)| (i, transform.translation))
@@ -577,7 +571,6 @@ fn update_octree_visualization(
         return;
     }
 
-    // Build octree to get visualization data
     let octree = Octree::from_points(
         &nodes_data,
         physics.octree_max_depth,
@@ -586,34 +579,22 @@ fn update_octree_visualization(
 
     let visualization_data = octree.get_visualization_data();
 
-    // Filter visualization data based on config
-    let filtered_bounds: Vec<&OctreeVisualizationNode> = visualization_data.iter()
+    let filtered_visualization: Vec<&OctreeVisualizationNode> = visualization_data.iter()
         .filter(|node| {
-            visualization_config.show_octree_bounds
-                && node.depth <= visualization_config.max_depth_to_show
-                && node.total_mass >= visualization_config.min_mass_to_show
+            node.depth <= visualization_config.max_depth_to_show
         })
         .filter(|node| {
             !visualization_config.show_leaf_only || node.is_leaf
         })
         .collect();
 
-    let filtered_centers: Vec<&OctreeVisualizationNode> = visualization_data.iter()
-        .filter(|node| {
-            visualization_config.show_center_of_mass
-                && node.depth <= visualization_config.max_depth_to_show
-                && node.total_mass >= visualization_config.min_mass_to_show
-        })
-        .filter(|node| {
-            !visualization_config.show_leaf_only || node.is_leaf
-        })
-        .collect();
+    let empty: Vec<&OctreeVisualizationNode> = Vec::new();
 
-    // Update bounds visualization
+    // bounds visualization
     update_visualization_entities(
         &mut commands,
         bounds_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
-        &filtered_bounds,
+        if visualization_config.show_octree_bounds { &filtered_visualization } else { &empty },
         |node| (node.bounds.center(), node.bounds.size(), node.depth),
         |depth| (
             Mesh3d(visualization_meshes.bounds_mesh.clone()),
@@ -623,11 +604,11 @@ fn update_octree_visualization(
         ),
     );
 
-    // Update center of mass visualization
+    // center of mass visualization
     update_visualization_entities(
         &mut commands,
         center_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
-        &filtered_centers,
+        if visualization_config.show_center_of_mass { &filtered_visualization } else { &empty },
         |node| {
             // Scale based on mass, per volume
             let size = (node.total_mass).powf(1.0/3.0).clamp(0.2, 20.0);
@@ -648,7 +629,6 @@ fn update_visualization_entities<C: Bundle>(
     extract_transform_data: impl Fn(&OctreeVisualizationNode) -> (Vec3, Vec3, usize),
     create_component: impl Fn(usize) -> C,
 ) {
-    // Update existing entities
     for (i, data) in new_data.iter().enumerate() {
         let (position, scale, depth) = extract_transform_data(data);
         
@@ -663,7 +643,6 @@ fn update_visualization_entities<C: Bundle>(
         }
     }
 
-    // Despawn excess entities
     for (entity, _, _) in existing_entities.iter().skip(new_data.len()) {
         commands.entity(*entity).despawn();
     }
