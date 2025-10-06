@@ -67,6 +67,7 @@ struct OctreeCenterOfMass {
 struct OctreeVisualizationConfig {
     show_octree_bounds: bool,
     show_center_of_mass: bool,
+    show_leaf_only: bool,
     max_depth_to_show: usize,
     min_mass_to_show: f32,
 }
@@ -76,6 +77,7 @@ impl Default for OctreeVisualizationConfig {
         Self {
             show_octree_bounds: true,
             show_center_of_mass: true,
+            show_leaf_only: true,
             max_depth_to_show: 8,
             min_mass_to_show: 1.0,
         }
@@ -591,6 +593,9 @@ fn update_octree_visualization(
                 && node.depth <= visualization_config.max_depth_to_show
                 && node.total_mass >= visualization_config.min_mass_to_show
         })
+        .filter(|node| {
+            !visualization_config.show_leaf_only || node.is_leaf
+        })
         .collect();
 
     let filtered_centers: Vec<&OctreeVisualizationNode> = visualization_data.iter()
@@ -598,6 +603,9 @@ fn update_octree_visualization(
             visualization_config.show_center_of_mass
                 && node.depth <= visualization_config.max_depth_to_show
                 && node.total_mass >= visualization_config.min_mass_to_show
+        })
+        .filter(|node| {
+            !visualization_config.show_leaf_only || node.is_leaf
         })
         .collect();
 
@@ -622,7 +630,7 @@ fn update_octree_visualization(
         &filtered_centers,
         |node| {
             // Scale based on mass, per volume
-            let size = (node.total_mass * 0.1).powf(1.0/3.0).clamp(0.2, 20.0);
+            let size = (node.total_mass).powf(1.0/3.0).clamp(0.2, 20.0);
             (node.center_of_mass, Vec3::splat(size), node.depth)
         },
         |depth| (
