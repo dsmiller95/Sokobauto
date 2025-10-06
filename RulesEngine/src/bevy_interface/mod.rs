@@ -9,7 +9,6 @@ use rand::Rng;
 use std::collections::HashMap;
 use bevy::mesh::ConeAnchor;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
-use bevy::ecs::error::panic;
 use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use crate::bevy_interface::spatial_hash::SpatialHash;
 use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode};
@@ -312,6 +311,53 @@ fn setup_compute_cache(
     commands.insert_resource(compute_cache);
 }
 
+fn apply_attraction_forces(
+    node: &GraphNode,
+    current_pos: Vec3,
+    compute_cache: &GraphComputeCache,
+    node_positions: &NodePositions,
+    physics: &PhysicsConfig,
+) -> Vec3 {
+    let mut attraction_force = Vec3::ZERO;
+    
+    if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
+        for &neighbor_id in neighbors {
+            if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
+                let diff = neighbor_pos - current_pos;
+                let distance = diff.length().max(0.1);
+                let attraction = diff.normalize() * physics.attraction_strength * distance;
+                attraction_force += attraction;
+            }
+        }
+    }
+    
+    attraction_force
+}
+
+fn integrate_physics(
+    node: &mut GraphNode,
+    transform: &mut Transform,
+    total_force: Vec3,
+    physics: &PhysicsConfig,
+    dt: f32,
+) {
+    // Apply damping
+    node.velocity *= physics.damping;
+    
+    // Apply force
+    node.velocity += total_force * dt;
+    
+    // Limit velocity
+    if node.velocity.length() > physics.max_velocity {
+        node.velocity = node.velocity.normalize() * physics.max_velocity;
+    }
+    
+    // Update position
+    transform.translation += node.velocity * dt;
+    
+    // Update node positions resource
+}
+
 fn apply_forces(
     mut node_query: Query<(&mut Transform, &mut GraphNode)>,
     mut node_positions: ResMut<NodePositions>,
@@ -345,25 +391,10 @@ fn apply_forces(
                     force += repulsion;
                 }
 
-                if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-                    for &neighbor_id in neighbors {
-                        if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                            let diff = neighbor_pos - current_pos;
-                            let distance = diff.length().max(0.1);
-                            let attraction = diff.normalize() * physics.attraction_strength * distance;
-                            force += attraction;
-                        }
-                    }
-                }
+                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
 
-                node.velocity *= physics.damping;
-                node.velocity += force * dt;
+                integrate_physics(&mut node, &mut transform, force, &physics, dt);
 
-                if node.velocity.length() > physics.max_velocity {
-                    node.velocity = node.velocity.normalize() * physics.max_velocity;
-                }
-
-                transform.translation += node.velocity * dt;
                 node_positions.positions.insert(node.id, transform.translation);
             }
         }
@@ -386,25 +417,10 @@ fn apply_forces(
                     force += repulsion;
                 }
 
-                if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-                    for &neighbor_id in neighbors {
-                        if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                            let diff = neighbor_pos - current_pos;
-                            let distance = diff.length().max(0.1);
-                            let attraction = diff.normalize() * physics.attraction_strength * distance;
-                            force += attraction;
-                        }
-                    }
-                }
-
-                node.velocity *= physics.damping;
-                node.velocity += force * dt;
-
-                if node.velocity.length() > physics.max_velocity {
-                    node.velocity = node.velocity.normalize() * physics.max_velocity;
-                }
-
-                transform.translation += node.velocity * dt;
+                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
+                
+                integrate_physics(&mut node, &mut transform, force, &physics, dt);
+                
                 node_positions.positions.insert(node.id, transform.translation);
             }
         }
@@ -426,29 +442,13 @@ fn apply_forces(
                     physics.repulsion_strength,
                 );
 
-                if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-                    for &neighbor_id in neighbors {
-                        if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                            let diff = neighbor_pos - current_pos;
-                            let distance = diff.length().max(0.1);
-                            let attraction = diff.normalize() * physics.attraction_strength * distance;
-                            force += attraction;
-                        }
-                    }
-                }
-
-                node.velocity *= physics.damping;
-                node.velocity += force * dt;
-
-                if node.velocity.length() > physics.max_velocity {
-                    node.velocity = node.velocity.normalize() * physics.max_velocity;
-                }
-
-                transform.translation += node.velocity * dt;
+                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
+                
+                integrate_physics(&mut node, &mut transform, force, &physics, dt);
+                
                 node_positions.positions.insert(node.id, transform.translation);
             }
         }
-        _ => panic!("Unknown physics mode"),
     }
 }
 
