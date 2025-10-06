@@ -1,5 +1,6 @@
 mod spatial_hash;
 mod octree;
+mod config_ui;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -12,6 +13,10 @@ use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use crate::bevy_interface::spatial_hash::SpatialHash;
 use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode};
+use crate::bevy_interface::config_ui::{
+    setup_config_panel, handle_toggle_interactions, 
+    on_toggle_octree_bounds, on_toggle_center_of_mass, on_toggle_leaf_only
+};
 
 #[derive(Component)]
 struct GraphNode {
@@ -124,8 +129,11 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             octree_max_depth: 8, // Should handle 50k nodes well
             octree_max_points_per_leaf: 16, // Reasonable leaf size
         })
-        .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_compute_cache, setup_fps_counter, setup_octree_visualization).chain())
-        .add_systems(Update, (apply_forces, update_edges, update_fps_counter, update_octree_visualization))
+        .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_compute_cache, setup_fps_counter, setup_octree_visualization, setup_config_panel).chain())
+        .add_systems(Update, (apply_forces, update_edges, update_fps_counter, update_octree_visualization, handle_toggle_interactions))
+        .add_observer(on_toggle_octree_bounds)
+        .add_observer(on_toggle_center_of_mass)
+        .add_observer(on_toggle_leaf_only)
         .run();
 }
 
