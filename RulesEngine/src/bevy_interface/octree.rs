@@ -110,7 +110,7 @@ impl OctreeNode {
             let octant_index = self.bounds.octant_index(position);
             if let Some(ref mut children) = self.children {
                 // TODO: should max_depth be decremented? do we have tests to ensure max depth is respected?
-                children[octant_index].insert(node_id, position, mass, max_depth, max_points_per_leaf);
+                children[octant_index].insert(node_id, position, mass, max_depth - 1, max_points_per_leaf);
             }
         }
     }
@@ -360,11 +360,11 @@ mod tests {
         // Center of mass should be at the midpoint for all nodes
         let expected_com = Vec3::new(2.05, 2.05, 2.05);
         assert!((octree.root.center_of_mass - expected_com).length() < 0.0001);
-        assert_eq!(octree.root.total_mass, 2.0);
+        assert_eq!(octree.root.total_mass, NODE_MASS * 8.0);
         assert!((child.center_of_mass - expected_com).length() < 0.0001);
-        assert_eq!(child.total_mass, 2.0);
+        assert_eq!(child.total_mass, NODE_MASS * 8.0);
         assert!((grandchild.center_of_mass - expected_com).length() < 0.0001);
-        assert_eq!(grandchild.total_mass, 2.0);
+        assert_eq!(grandchild.total_mass, NODE_MASS * 8.0);
     }
 
     #[test]
