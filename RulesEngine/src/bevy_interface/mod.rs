@@ -2,6 +2,8 @@ mod spatial_hash;
 mod octree;
 mod config_ui;
 mod bounds;
+mod fps_ui;
+mod octree_visualization;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -18,6 +20,8 @@ use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode, OctreeResou
 use crate::bevy_interface::config_ui::{
     setup_config_panel, handle_toggle_interactions, on_toggle_event
 };
+use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
+use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 
 #[derive(Component)]
 struct GraphNode {
@@ -59,46 +63,6 @@ struct PhysicsConfig {
     octree_theta: f32,
     octree_max_depth: usize,
     octree_max_points_per_leaf: usize,
-}
-
-#[derive(Component)]
-struct FpsText;
-
-#[derive(Component)]
-struct OctreeBounds {
-    depth: usize,
-}
-
-#[derive(Component)]
-struct OctreeCenterOfMass {
-    depth: usize,
-}
-
-#[derive(Resource)]
-struct OctreeVisualizationConfig {
-    show_octree_bounds: bool,
-    show_center_of_mass: bool,
-    show_leaf_only: bool,
-    max_depth_to_show: usize,
-}
-
-impl Default for OctreeVisualizationConfig {
-    fn default() -> Self {
-        Self {
-            show_octree_bounds: true,
-            show_center_of_mass: true,
-            show_leaf_only: true,
-            max_depth_to_show: 8,
-        }
-    }
-}
-
-#[derive(Resource)]
-struct OctreeVisualizationMeshes {
-    bounds_mesh: Handle<Mesh>,
-    center_of_mass_mesh: Handle<Mesh>,
-    bounds_material: Handle<StandardMaterial>,
-    center_of_mass_material: Handle<StandardMaterial>,
 }
 
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
@@ -215,7 +179,6 @@ impl GraphComputeCache {
 fn setup_scene(
     mut commands: Commands,
 ) {
-    // Add camera with pan/orbit controls
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(20.0, 20.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -495,161 +458,4 @@ fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {
     };
     
     Color::srgb(1.0 - t, 0.0, t)
-}
-
-fn setup_fps_counter(mut commands: Commands) {
-    commands.spawn((
-        Text::new("FPS: --"),
-        TextFont {
-            font_size: 24.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(10.0),
-            left: Val::Px(10.0),
-            ..default()
-        },
-        FpsText,
-    ));
-}
-
-fn update_fps_counter(
-    diagnostics: Res<DiagnosticsStore>,
-    mut fps_text_query: Query<&mut Text, With<FpsText>>,
-) {
-    let Ok(mut text) = fps_text_query.single_mut() else { return };
-    let Some(fps_diagnostic) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) else { return };
-    let Some(fps_smoothed) = fps_diagnostic.smoothed() else { return };
-    text.0 = format!("FPS: {:.1}", fps_smoothed);
-}
-
-fn setup_octree_visualization(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let bounds_mesh = meshes.add(Cuboid::new(0.99, 0.99, 0.99));
-    let center_of_mass_mesh = meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap());
-
-    let bounds_material = materials.add(StandardMaterial {
-        base_color: Color::hsl(10.0, 0.3, 0.0).with_alpha(0.0), // Semi-transparent wireframe
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        ..default()
-    });
-
-    let center_of_mass_material = materials.add(StandardMaterial {
-        base_color: Color::hsl(190.0, 1.0, 0.5),
-        unlit: true,
-        ..default()
-    });
-
-    commands.insert_resource(OctreeVisualizationMeshes {
-        bounds_mesh,
-        center_of_mass_mesh,
-        bounds_material,
-        center_of_mass_material,
-    });
-}
-
-fn update_octree_visualization(
-    mut commands: Commands,
-    node_query: Query<&Transform, (With<GraphNode>, Without<OctreeBounds>, Without<OctreeCenterOfMass>)>,
-    mut bounds_query: Query<(Entity, &mut Transform, &OctreeBounds), (Without<GraphNode>, Without<OctreeCenterOfMass>)>,
-    mut center_query: Query<(Entity, &mut Transform, &OctreeCenterOfMass), (Without<GraphNode>, Without<OctreeBounds>)>,
-    physics: Res<PhysicsConfig>,
-    visualization_config: Res<OctreeVisualizationConfig>,
-    visualization_meshes: Res<OctreeVisualizationMeshes>,
-    time: Res<Time>,
-) {
-    if physics.physics_mode != PhysicsMode::Octree || time.elapsed().as_secs_f32() > 60.0 {
-        return;
-    }
-
-    let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
-        .enumerate()
-        .map(|(i, transform)| (i, transform.translation))
-        .collect();
-
-    if nodes_data.is_empty() {
-        return;
-    }
-
-    let octree = Octree::from_points(
-        &nodes_data,
-        physics.octree_max_depth,
-        physics.octree_max_points_per_leaf,
-    );
-
-    let visualization_data = octree.get_visualization_data();
-
-    let filtered_visualization: Vec<&OctreeVisualizationNode> = visualization_data.iter()
-        .filter(|node| {
-            node.depth <= visualization_config.max_depth_to_show
-        })
-        .filter(|node| {
-            !visualization_config.show_leaf_only || node.is_leaf
-        })
-        .collect();
-
-    let empty: Vec<&OctreeVisualizationNode> = Vec::new();
-
-    // bounds visualization
-    update_visualization_entities(
-        &mut commands,
-        bounds_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
-        if visualization_config.show_octree_bounds { &filtered_visualization } else { &empty },
-        |node| (node.bounds.center(), node.bounds.size(), node.depth),
-        |depth| (
-            Mesh3d(visualization_meshes.bounds_mesh.clone()),
-            MeshMaterial3d(visualization_meshes.bounds_material.clone()),
-            Wireframe::default(),
-            OctreeBounds { depth }
-        ),
-    );
-
-    // center of mass visualization
-    update_visualization_entities(
-        &mut commands,
-        center_query.iter_mut().map(|(e, t, c)| (e, t, c.depth)).collect(),
-        if visualization_config.show_center_of_mass { &filtered_visualization } else { &empty },
-        |node| {
-            // Scale based on mass, per volume
-            let size = (node.total_mass).powf(1.0/3.0).clamp(0.2, 20.0);
-            (node.center_of_mass, Vec3::splat(size), node.depth)
-        },
-        |depth| (
-            Mesh3d(visualization_meshes.center_of_mass_mesh.clone()),
-            MeshMaterial3d(visualization_meshes.center_of_mass_material.clone()),
-            OctreeCenterOfMass { depth }
-        ),
-    );
-}
-
-fn update_visualization_entities<C: Bundle>(
-    commands: &mut Commands,
-    mut existing_entities: Vec<(Entity, Mut<Transform>, usize)>,
-    new_data: &[&OctreeVisualizationNode],
-    extract_transform_data: impl Fn(&OctreeVisualizationNode) -> (Vec3, Vec3, usize),
-    create_component: impl Fn(usize) -> C,
-) {
-    for (i, data) in new_data.iter().enumerate() {
-        let (position, scale, depth) = extract_transform_data(data);
-        
-        if let Some((_, transform, _)) = existing_entities.get_mut(i) {
-            transform.translation = position;
-            transform.scale = scale;
-        } else {
-            commands.spawn((
-                Transform::from_translation(position).with_scale(scale),
-                create_component(depth),
-            ));
-        }
-    }
-
-    for (entity, _, _) in existing_entities.iter().skip(new_data.len()) {
-        commands.entity(*entity).despawn();
-    }
 }
