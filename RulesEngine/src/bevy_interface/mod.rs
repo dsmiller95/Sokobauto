@@ -23,6 +23,9 @@ use crate::bevy_interface::config_ui::{
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 
+const RENDER_NODES: bool = true;
+const RENDER_EDGES: bool = true;
+
 #[derive(Component)]
 struct GraphNode {
     id: usize,
@@ -72,7 +75,7 @@ struct UserConfig {
 
 impl UserConfig {
     fn is_simulation_disabled(&self, time: &Time) -> bool {
-        !self.force_simulation_enabled && time.elapsed().as_secs_f32() > 60.0
+        !self.force_simulation_enabled && time.elapsed().as_secs_f32() > 10.0
     }
     fn is_octree_update_disabled(&self, time: &Time, physics_config: &PhysicsConfig) -> bool {
         physics_config.physics_mode != PhysicsMode::Octree ||
@@ -214,7 +217,7 @@ fn setup_graph_from_data(
     let mut rng = rand::thread_rng();
     let mut node_positions = HashMap::new();
 
-    let node_mesh = meshes.add(Sphere::new(0.8).mesh().ico(4).unwrap());
+    let node_mesh = meshes.add(Sphere::new(0.8).mesh().ico(0).unwrap());
 
     let node_materials = (0..=graph_data.max_on_targets).map(|on_targets| {
         let color = interpolate_color(on_targets, graph_data.max_on_targets);
@@ -226,6 +229,22 @@ fn setup_graph_from_data(
     })
         .collect::<Vec<_>>();
 
+    let mut arrow_mesh = Cone::new(0.15, 0.2).mesh()
+        .anchor(ConeAnchor::Tip).resolution(4).build();
+    arrow_mesh.translate_by(Vec3::new(0.0, 0.3, 0.0));
+    let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0).mesh()
+        .latitudes(4).longitudes(4).build());
+    edge_mesh.merge(&arrow_mesh).unwrap();
+
+    // let edge_mesh = Mesh::from(Segment3d::new(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)));
+
+    let edge_mesh_handle = meshes.add(edge_mesh);
+    let edge_material_handle = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.7, 0.7, 0.7),
+        unlit: true,
+        ..default()
+    });
+
     for node_data in &graph_data.nodes {
         let position = Vec3::new(
             rng.gen_range(-15.0..15.0),
@@ -233,9 +252,7 @@ fn setup_graph_from_data(
             rng.gen_range(-15.0..15.0),
         );
         
-        commands.spawn((
-            Mesh3d(node_mesh.clone()),
-            MeshMaterial3d(node_materials[node_data.on_targets].clone()),
+        let mut entity = commands.spawn((
             Transform::from_translation(position),
             GraphNode {
                 id: node_data.id,
@@ -243,22 +260,16 @@ fn setup_graph_from_data(
                 on_targets: node_data.on_targets,
             },
         ));
+
+        if RENDER_NODES {
+            entity.insert((
+                Mesh3d(node_mesh.clone()),
+                MeshMaterial3d(node_materials[node_data.on_targets].clone()),
+            ));
+        }
         
         node_positions.insert(node_data.id, position);
     }
-
-    let mut arrow_mesh = Cone::new(0.15, 0.2).mesh()
-        .anchor(ConeAnchor::Tip).resolution(8).build();
-    arrow_mesh.translate_by(Vec3::new(0.0, 0.3, 0.0));
-    let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0));
-    edge_mesh.merge(&arrow_mesh).unwrap();
-
-    let edge_mesh_handle = meshes.add(edge_mesh);
-    let edge_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.7, 0.7, 0.7),
-        unlit: true,
-        ..default()
-    });
 
     for edge in graph_data.edges.iter() {
         let from_id = edge.from;
@@ -270,15 +281,20 @@ fn setup_graph_from_data(
             let mut transform = Transform::default();
             set_edge_transform(&mut transform, from_pos, to_pos);
 
-            commands.spawn((
-                Mesh3d(edge_mesh_handle.clone()),
-                MeshMaterial3d(edge_material.clone()),
+            let mut entity = commands.spawn((
                 transform,
                 GraphEdge {
                     from_id,
                     to_id,
                 },
             ));
+
+            if RENDER_EDGES  {
+                entity.insert((
+                    Mesh3d(edge_mesh_handle.clone()),
+                    MeshMaterial3d(edge_material_handle.clone()),
+                ));
+            }
         }
     }
     
