@@ -57,7 +57,7 @@ const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 const ACTIVE_BUTTON: Color = Color::srgb(0.2, 0.6, 0.2);
 
-pub fn setup_config_panel(mut commands: Commands) {
+pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<OctreeVisualizationConfig>) {
     // Root UI container
     commands
         .spawn((
@@ -92,7 +92,8 @@ pub fn setup_config_panel(mut commands: Commands) {
             ));
 
             for toggle_type in [ToggleType::OctreeBounds, ToggleType::CenterOfMass, ToggleType::LeafOnly] {
-                create_toggle_row(parent, true, toggle_type);
+                let initial_state = toggle_type.get_value(&visualization_config);
+                create_toggle_row(parent, initial_state, toggle_type);
             }
         });
 }

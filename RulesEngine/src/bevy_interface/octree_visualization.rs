@@ -38,8 +38,8 @@ pub struct OctreeVisualizationMeshes {
 impl Default for OctreeVisualizationConfig {
     fn default() -> Self {
         Self {
-            show_octree_bounds: true,
-            show_center_of_mass: true,
+            show_octree_bounds: false,
+            show_center_of_mass: false,
             show_leaf_only: true,
             max_depth_to_show: 8,
         }
