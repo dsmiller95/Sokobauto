@@ -90,19 +90,23 @@ pub fn update_octree_visualization(
     }
 
     let octree = &octree_resource.octree;
+    let visualization_enabled = visualization_config.show_octree_bounds || visualization_config.show_center_of_mass;
 
-    let visualization_data = octree.get_visualization_data();
+    let filtered_visualization: Vec<OctreeVisualizationNode> = if visualization_enabled {
+        let visualization_data = octree.get_visualization_data();
+        visualization_data.into_iter()
+            .filter(|node| {
+                node.depth <= visualization_config.max_depth_to_show
+            })
+            .filter(|node| {
+                !visualization_config.show_leaf_only || node.is_leaf
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
-    let filtered_visualization: Vec<&OctreeVisualizationNode> = visualization_data.iter()
-        .filter(|node| {
-            node.depth <= visualization_config.max_depth_to_show
-        })
-        .filter(|node| {
-            !visualization_config.show_leaf_only || node.is_leaf
-        })
-        .collect();
-
-    let empty: Vec<&OctreeVisualizationNode> = Vec::new();
+    let empty: Vec<OctreeVisualizationNode> = Vec::new();
 
     // bounds visualization
     update_visualization_entities(
@@ -139,7 +143,7 @@ pub fn update_octree_visualization(
 fn update_visualization_entities<C: Bundle>(
     commands: &mut Commands,
     mut existing_entities: Vec<(Entity, Mut<Transform>, usize)>,
-    new_data: &[&OctreeVisualizationNode],
+    new_data: &[OctreeVisualizationNode],
     extract_transform_data: impl Fn(&OctreeVisualizationNode) -> (Vec3, Vec3, usize),
     create_component: impl Fn(usize) -> C,
 ) {
