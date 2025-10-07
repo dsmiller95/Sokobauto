@@ -11,19 +11,18 @@ use crate::state_graph::StateGraph;
 use crate::core::SharedGameState;
 use rand::Rng;
 use std::collections::{HashMap};
-use bevy::mesh::ConeAnchor;
-use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
-use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin};
+use bevy::pbr::wireframe::{WireframePlugin};
 use crate::bevy_interface::bounds::Bounds;
 use crate::bevy_interface::spatial_hash::SpatialHash;
-use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode, OctreeResource};
+use crate::bevy_interface::octree::{Octree, OctreeResource};
 use crate::bevy_interface::config_ui::{
     setup_config_panel, handle_toggle_interactions, on_toggle_event
 };
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 
-const RENDER_NODES: bool = true;
+const RENDER_NODES: bool = false;
 const RENDER_EDGES: bool = true;
 
 #[derive(Component)]
@@ -229,14 +228,14 @@ fn setup_graph_from_data(
     })
         .collect::<Vec<_>>();
 
-    let mut arrow_mesh = Cone::new(0.15, 0.2).mesh()
-        .anchor(ConeAnchor::Tip).resolution(4).build();
-    arrow_mesh.translate_by(Vec3::new(0.0, 0.3, 0.0));
-    let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0).mesh()
-        .latitudes(4).longitudes(4).build());
-    edge_mesh.merge(&arrow_mesh).unwrap();
+    // let mut arrow_mesh = Cone::new(0.15, 0.2).mesh()
+    //     .anchor(ConeAnchor::Tip).resolution(4).build();
+    // arrow_mesh.translate_by(Vec3::new(0.0, 0.3, 0.0));
+    // let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0).mesh()
+    //     .latitudes(4).longitudes(4).build());
+    // edge_mesh.merge(&arrow_mesh).unwrap();
 
-    // let edge_mesh = Mesh::from(Segment3d::new(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)));
+    let edge_mesh = Mesh::from(Segment3d::new(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)));
 
     let edge_mesh_handle = meshes.add(edge_mesh);
     let edge_material_handle = materials.add(StandardMaterial {
