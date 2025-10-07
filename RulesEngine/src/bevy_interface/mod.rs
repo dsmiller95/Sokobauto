@@ -455,16 +455,10 @@ fn apply_forces_and_update_octree(
             integrate_physics(&mut node, &mut transform, *force, &physics, dt);
             let new_pos = transform.translation;
 
-            octree_resource.octree.update_point_resize(node.id, old_pos, new_pos, resize_bounds);
+            octree_resource.octree.update_resize(node.id, old_pos, new_pos, Bounds::resize_expand);
             node_positions.positions.insert(node.id, new_pos);
         }
     }
-}
-
-fn resize_bounds(bounds: &Bounds, point: &Vec3) -> Bounds {
-    let mut new_bounds = *bounds;
-    new_bounds.include(*point);
-    new_bounds.doubled()
 }
 
 fn update_edges(
