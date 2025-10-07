@@ -4,6 +4,7 @@ mod config_ui;
 mod bounds;
 mod fps_ui;
 mod octree_visualization;
+mod edge_renderer;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -21,9 +22,11 @@ use crate::bevy_interface::config_ui::{
 };
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
+use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 
 const RENDER_NODES: bool = false;
 const RENDER_EDGES: bool = true;
+const USE_SHADER_EDGES: bool = true;
 
 #[derive(Component)]
 struct GraphNode {
@@ -42,6 +45,9 @@ struct GraphEdge {
 struct NodePositions {
     positions: HashMap<usize, Vec3>,
 }
+
+#[derive(Resource)]
+struct NodeIdToIndex(HashMap<usize, usize>);
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum PhysicsMode {
@@ -88,8 +94,8 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         force_simulation_enabled: false,
     };
 
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "3D Force-Directed Graph".to_string(),
                 resolution: (1200, 800).into(),
@@ -102,8 +108,13 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(user_config)
         .insert_resource(graph_data)
-        .insert_resource(OctreeVisualizationConfig::default())
-        .insert_resource(PhysicsConfig {
+        .insert_resource(OctreeVisualizationConfig::default());
+
+    if USE_SHADER_EDGES {
+        app.add_plugins(EdgeRenderPlugin);
+    }
+
+    app.insert_resource(PhysicsConfig {
             repulsion_strength: 50.0,
             attraction_strength: 2.0,
             damping: 0.95,
@@ -116,8 +127,14 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             octree_max_points_per_leaf: 16, // Reasonable leaf size
         })
         .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_octree_resource, setup_compute_cache, setup_fps_counter, setup_octree_visualization, setup_config_panel).chain())
-        .add_systems(Update, (apply_forces_and_update_octree, update_edges, update_fps_counter, update_octree_visualization, handle_toggle_interactions))
-        .add_observer(on_toggle_event)
+        .add_systems(Update, (apply_forces_and_update_octree, update_edges, update_fps_counter, update_octree_visualization, handle_toggle_interactions));
+
+    if USE_SHADER_EDGES {
+        app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
+            .add_systems(Update, update_shader_edge_data);
+    }
+
+    app.add_observer(on_toggle_event)
         .run();
 }
 
@@ -234,15 +251,23 @@ fn setup_graph_from_data(
     // let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0).mesh()
     //     .latitudes(4).longitudes(4).build());
     // edge_mesh.merge(&arrow_mesh).unwrap();
+    
+    let edge_mesh_handle = if !USE_SHADER_EDGES {
+        let edge_mesh = Mesh::from(Segment3d::new(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)));
+        Some(meshes.add(edge_mesh))
+    } else {
+        None
+    };
 
-    let edge_mesh = Mesh::from(Segment3d::new(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)));
-
-    let edge_mesh_handle = meshes.add(edge_mesh);
-    let edge_material_handle = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.7, 0.7, 0.7),
-        unlit: true,
-        ..default()
-    });
+    let edge_material_handle = if !USE_SHADER_EDGES {
+        Some(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.7, 0.7, 0.7),
+            unlit: true,
+            ..default()
+        }))
+    } else {
+        None
+    };
 
     for node_data in &graph_data.nodes {
         let position = Vec3::new(
@@ -288,13 +313,40 @@ fn setup_graph_from_data(
                 },
             ));
 
-            if RENDER_EDGES  {
-                entity.insert((
-                    Mesh3d(edge_mesh_handle.clone()),
-                    MeshMaterial3d(edge_material_handle.clone()),
-                ));
+            if RENDER_EDGES && !USE_SHADER_EDGES {
+                if let (Some(mesh_handle), Some(material_handle)) = (&edge_mesh_handle, &edge_material_handle) {
+                    entity.insert((
+                        Mesh3d(mesh_handle.clone()),
+                        MeshMaterial3d(material_handle.clone()),
+                    ));
+                }
             }
         }
+    }
+
+    if USE_SHADER_EDGES {
+        let node_ids: Vec<usize> = graph_data.nodes.iter().map(|n| n.id).collect();
+        let id_to_index: HashMap<usize, usize> = node_ids.iter().enumerate()
+            .map(|(idx, &id)| (id, idx))
+            .collect();
+        
+        let vertices: Vec<Vec3> = node_ids.iter()
+            .map(|&id| *node_positions.get(&id).unwrap_or(&Vec3::ZERO))
+            .collect();
+            
+        let edges: Vec<[u32; 2]> = graph_data.edges.iter()
+            .filter_map(|edge| {
+                let from_idx = id_to_index.get(&edge.from)?;
+                let to_idx = id_to_index.get(&edge.to)?;
+                Some([*from_idx as u32, *to_idx as u32])
+            })
+            .collect();
+        
+        let mut edge_data = EdgeRenderData::new();
+        edge_data.update_vertices(vertices);
+        edge_data.update_edges(edges);
+        commands.insert_resource(edge_data);
+        commands.insert_resource(NodeIdToIndex(id_to_index));
     }
     
     commands.insert_resource(NodePositions { positions: node_positions });
@@ -463,7 +515,7 @@ fn update_edges(
     time: Res<Time>,
     user_config: Res<UserConfig>,
 ) {
-    if user_config.is_simulation_disabled(&time) {
+    if user_config.is_simulation_disabled(&time) || USE_SHADER_EDGES {
         return;
     }
     for (mut transform, edge) in edge_query.iter_mut() {
@@ -474,6 +526,29 @@ fn update_edges(
             set_edge_transform(&mut *transform, from_pos, to_pos);
         }
     }
+}
+
+fn update_shader_edge_data(
+    node_positions: Res<NodePositions>,
+    node_id_to_index: Res<NodeIdToIndex>,
+    mut edge_data: ResMut<EdgeRenderData>,
+    time: Res<Time>,
+    user_config: Res<UserConfig>,
+) {
+    if user_config.is_simulation_disabled(&time) {
+        return;
+    }
+
+    let mut vertices = vec![Vec3::ZERO; node_id_to_index.0.len()];
+    for (&node_id, &index) in &node_id_to_index.0 {
+        if let Some(&position) = node_positions.positions.get(&node_id) {
+            if index < vertices.len() {
+                vertices[index] = position;
+            }
+        }
+    }
+    
+    edge_data.update_vertices(vertices);
 }
 
 fn set_edge_transform(transform: &mut Transform, from: Vec3, to: Vec3) {
