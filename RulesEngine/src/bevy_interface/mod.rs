@@ -1,6 +1,7 @@
 mod spatial_hash;
 mod octree;
 mod config_ui;
+mod bounds;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -11,8 +12,9 @@ use std::collections::{HashMap};
 use bevy::mesh::ConeAnchor;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
+use crate::bevy_interface::bounds::Bounds;
 use crate::bevy_interface::spatial_hash::SpatialHash;
-use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode, OctreeResource, Bounds};
+use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode, OctreeResource};
 use crate::bevy_interface::config_ui::{
     setup_config_panel, handle_toggle_interactions, on_toggle_event
 };
@@ -307,11 +309,13 @@ fn setup_octree_resource(
     physics: Res<PhysicsConfig>,
 ) {
     let points: Vec<(usize, Vec3)> = node_positions.positions.iter().map(|(&id, &pos)| (id, pos)).collect();
-    let octree_resource = OctreeResource::from_points(
-        &points,
-        physics.octree_max_depth,
-        physics.octree_max_points_per_leaf,
-    );
+    let octree_resource = OctreeResource {
+        octree: Octree::from_points(
+            &points,
+            physics.octree_max_depth,
+            physics.octree_max_points_per_leaf,
+        )
+    };
     commands.insert_resource(octree_resource);
 }
 
@@ -360,21 +364,15 @@ fn integrate_physics(
     physics: &PhysicsConfig,
     dt: f32,
 ) {
-    // Apply damping
     node.velocity *= physics.damping;
     
-    // Apply force
     node.velocity += total_force * dt;
     
-    // Limit velocity
     if node.velocity.length() > physics.max_velocity {
         node.velocity = node.velocity.normalize() * physics.max_velocity;
     }
     
-    // Update position
     transform.translation += node.velocity * dt;
-    
-    // Update node positions resource
 }
 
 fn apply_forces_and_update_octree(
@@ -448,7 +446,6 @@ fn apply_forces_and_update_octree(
     }
 
 
-    // --- Phase 3: Integrate physics, update positions, update octree incrementally ---
     for (mut transform, mut node) in node_query.iter_mut() {
         if let Some(force) = forces.get(&node.id) {
             let old_pos = transform.translation;
