@@ -1,7 +1,7 @@
 mod spatial_hash;
-mod octree;
+pub mod octree;
 mod config_ui;
-mod bounds;
+pub mod bounds;
 mod fps_ui;
 mod octree_visualization;
 mod edge_renderer;

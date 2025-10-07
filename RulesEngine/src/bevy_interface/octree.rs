@@ -87,7 +87,7 @@ impl Octree {
     pub fn insert_resize(&mut self, node_id: usize, position: Vec3, mass: f32, resize: impl FnOnce(&Bounds, &Vec3) -> Bounds) {
         if !self.root.bounds.contains(position) {
             let new_bounds = resize(&self.root.bounds, &position);
-            if(!new_bounds.contains(position)) {
+            if !new_bounds.contains(position) {
                 panic!("Resize function did not produce bounds that contain the new point");
             }
 
