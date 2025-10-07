@@ -1,3 +1,4 @@
+use bevy::camera::visibility::{NoCpuCulling, NoFrustumCulling};
 use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
 
@@ -37,6 +38,8 @@ pub fn spawn_edge_mesh(
         Mesh3d(mesh_handle),
         MeshMaterial3d(material_handle),
         EdgeMeshEntity,
+        NoFrustumCulling,
+        NoCpuCulling,
     ));
 }
 

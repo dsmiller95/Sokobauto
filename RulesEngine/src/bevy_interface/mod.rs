@@ -24,7 +24,7 @@ use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 
-const RENDER_NODES: bool = false;
+const RENDER_NODES: bool = true;
 const RENDER_EDGES: bool = true;
 const USE_SHADER_EDGES: bool = true;
 
@@ -251,7 +251,7 @@ fn setup_graph_from_data(
     // let mut edge_mesh = Mesh::from(Capsule3d::new(0.03, 1.0).mesh()
     //     .latitudes(4).longitudes(4).build());
     // edge_mesh.merge(&arrow_mesh).unwrap();
-    
+
     let edge_mesh_handle = if !USE_SHADER_EDGES {
         let edge_mesh = Mesh::from(Segment3d::new(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)));
         Some(meshes.add(edge_mesh))
