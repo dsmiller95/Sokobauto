@@ -1,0 +1,1 @@
+﻿ cargo bench --bench octree_benchmarks -- --save-baseline main
