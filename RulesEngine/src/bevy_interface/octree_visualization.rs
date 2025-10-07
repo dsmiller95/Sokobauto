@@ -5,8 +5,8 @@ use bevy::mesh::{Mesh, Mesh3d};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::pbr::wireframe::Wireframe;
 use bevy::prelude::{default, AlphaMode, Bundle, Commands, Component, Cuboid, Entity, Mut, Query, Res, ResMut, Resource, Sphere, Time, Transform, With, Without};
-use crate::bevy_interface::{GraphNode, PhysicsConfig, PhysicsMode};
-use crate::bevy_interface::octree::{Octree, OctreeResource, OctreeVisualizationNode};
+use crate::bevy_interface::{GraphNode, PhysicsConfig, UserConfig};
+use crate::bevy_interface::octree::{OctreeResource, OctreeVisualizationNode};
 
 
 #[derive(Component)]
@@ -81,11 +81,12 @@ pub fn update_octree_visualization(
     mut bounds_query: Query<(Entity, &mut Transform, &OctreeBounds), (Without<GraphNode>, Without<OctreeCenterOfMass>)>,
     mut center_query: Query<(Entity, &mut Transform, &OctreeCenterOfMass), (Without<GraphNode>, Without<OctreeBounds>)>,
     physics: Res<PhysicsConfig>,
+    user_config: Res<UserConfig>,
     visualization_config: Res<OctreeVisualizationConfig>,
     visualization_meshes: Res<OctreeVisualizationMeshes>,
     time: Res<Time>,
 ) {
-    if physics.physics_mode != PhysicsMode::Octree || time.elapsed().as_secs_f32() > 60.0 {
+    if user_config.is_octree_update_disabled(&time, &physics) {
         return;
     }
 

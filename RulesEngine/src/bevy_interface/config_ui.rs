@@ -1,6 +1,6 @@
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use super::OctreeVisualizationConfig;
+use super::{OctreeVisualizationConfig, UserConfig};
 
 #[derive(Component)]
 pub struct ConfigPanel;
@@ -10,36 +10,49 @@ pub enum ToggleType {
     OctreeBounds,
     CenterOfMass,
     LeafOnly,
+    ForceSimulate,
 }
 
 impl ToggleType {
+    pub fn all_types() -> &'static [ToggleType] {
+        &[
+            ToggleType::OctreeBounds,
+            ToggleType::CenterOfMass,
+            ToggleType::LeafOnly,
+            ToggleType::ForceSimulate,
+        ]
+    }
+    
     pub fn label(&self) -> &'static str {
         match self {
             ToggleType::OctreeBounds => "Show Octree Bounds",
             ToggleType::CenterOfMass => "Show Center of Mass",
             ToggleType::LeafOnly => "Show Leaf Only",
+            ToggleType::ForceSimulate => "Force Simulation On",
         }
     }
 
-    pub fn get_value(&self, config: &OctreeVisualizationConfig) -> bool {
+    pub fn get_value(&self, config: &OctreeVisualizationConfig, user_config: &UserConfig) -> bool {
         match self {
             ToggleType::OctreeBounds => config.show_octree_bounds,
             ToggleType::CenterOfMass => config.show_center_of_mass,
             ToggleType::LeafOnly => config.show_leaf_only,
+            ToggleType::ForceSimulate => user_config.force_simulation_enabled,
         }
     }
 
-    pub fn set_value(&self, config: &mut OctreeVisualizationConfig, value: bool) {
+    pub fn set_value(&self, config: &mut OctreeVisualizationConfig, user_config: &mut UserConfig, value: bool) {
         match self {
             ToggleType::OctreeBounds => config.show_octree_bounds = value,
             ToggleType::CenterOfMass => config.show_center_of_mass = value,
             ToggleType::LeafOnly => config.show_leaf_only = value,
+            ToggleType::ForceSimulate => user_config.force_simulation_enabled = value,
         }
     }
 
-    pub fn toggle_value(&self, config: &mut OctreeVisualizationConfig) {
-        let current = self.get_value(config);
-        self.set_value(config, !current);
+    pub fn toggle_value(&self, config: &mut OctreeVisualizationConfig, user_config: &mut UserConfig) {
+        let current = self.get_value(config, user_config);
+        self.set_value(config, user_config, !current);
     }
 }
 
@@ -57,7 +70,7 @@ const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 const ACTIVE_BUTTON: Color = Color::srgb(0.2, 0.6, 0.2);
 
-pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<OctreeVisualizationConfig>) {
+pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<OctreeVisualizationConfig>, user_config: Res<UserConfig>) {
     // Root UI container
     commands
         .spawn((
@@ -91,8 +104,8 @@ pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<Octr
                 },
             ));
 
-            for toggle_type in [ToggleType::OctreeBounds, ToggleType::CenterOfMass, ToggleType::LeafOnly] {
-                let initial_state = toggle_type.get_value(&visualization_config);
+            for &toggle_type in ToggleType::all_types() {
+                let initial_state = toggle_type.get_value(&visualization_config, &user_config);
                 create_toggle_row(parent, initial_state, toggle_type);
             }
         });
@@ -170,6 +183,7 @@ pub fn handle_toggle_interactions(
     mut text_query: Query<&mut Text>,
     mut commands: Commands,
     config: Res<OctreeVisualizationConfig>,
+    user_config: Res<UserConfig>,
 ) {
     for (interaction, mut color, mut border_color, toggle, children) in interaction_query.iter_mut() {
         match *interaction {
@@ -187,7 +201,7 @@ pub fn handle_toggle_interactions(
             Interaction::None => {
                 *border_color = BorderColor::all(Color::srgb(0.5, 0.5, 0.5));
 
-                let is_active = toggle.toggle_type.get_value(&config);
+                let is_active = toggle.toggle_type.get_value(&config, &user_config);
                 *color = if is_active { ACTIVE_BUTTON } else { NORMAL_BUTTON }.into();
 
                 for child in children.iter() {
@@ -203,8 +217,9 @@ pub fn handle_toggle_interactions(
 pub fn on_toggle_event(
     trigger: On<ToggleEvent>,
     mut config: ResMut<OctreeVisualizationConfig>,
+    mut user_config: ResMut<UserConfig>,
 ) {
     let toggle_type = trigger.event().toggle_type;
-    toggle_type.toggle_value(&mut config);
-    println!("Toggled {:?}: {}", toggle_type, toggle_type.get_value(&config));
+    toggle_type.toggle_value(&mut config, &mut user_config);
+    println!("Toggled {:?}: {}", toggle_type, toggle_type.get_value(&config, &user_config));
 }

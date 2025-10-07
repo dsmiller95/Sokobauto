@@ -65,8 +65,26 @@ struct PhysicsConfig {
     octree_max_points_per_leaf: usize,
 }
 
+#[derive(Resource)]
+struct UserConfig {
+    force_simulation_enabled: bool,
+}
+
+impl UserConfig {
+    fn is_simulation_disabled(&self, time: &Time) -> bool {
+        !self.force_simulation_enabled && time.elapsed().as_secs_f32() > 60.0
+    }
+    fn is_octree_update_disabled(&self, time: &Time, physics_config: &PhysicsConfig) -> bool {
+        physics_config.physics_mode != PhysicsMode::Octree ||
+            self.is_simulation_disabled(time)
+    }
+}
+
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
     let graph_data = GraphData::from_state_graph(graph, shared);
+    let user_config = UserConfig {
+        force_simulation_enabled: false,
+    };
 
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -80,6 +98,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(WireframePlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .insert_resource(user_config)
         .insert_resource(graph_data)
         .insert_resource(OctreeVisualizationConfig::default())
         .insert_resource(PhysicsConfig {
@@ -343,12 +362,14 @@ fn apply_forces_and_update_octree(
     mut node_positions: ResMut<NodePositions>,
     compute_cache: Res<GraphComputeCache>,
     physics: Res<PhysicsConfig>,
+    user_config: Res<UserConfig>,
     mut octree_resource: ResMut<OctreeResource>,
     time: Res<Time>,
 ) {
-    if time.elapsed().as_secs_f32() > 60.0 {
+    if user_config.is_simulation_disabled(&time) {
         return;
     }
+
     println!("Simulating step at t={:.2}", time.elapsed().as_secs_f32());
 
     let dt = time.delta_secs();
@@ -425,8 +446,9 @@ fn update_edges(
     mut edge_query: Query<(&mut Transform, &GraphEdge)>,
     node_positions: Res<NodePositions>,
     time: Res<Time>,
+    user_config: Res<UserConfig>,
 ) {
-    if time.elapsed().as_secs_f32() > 60.0 {
+    if user_config.is_simulation_disabled(&time) {
         return;
     }
     for (mut transform, edge) in edge_query.iter_mut() {
