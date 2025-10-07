@@ -1,6 +1,6 @@
-mod console_interface;
+pub mod console_interface;
 mod models;
 pub mod bevy_interface;
-mod core;
-mod state_graph;
+pub mod core;
+pub mod state_graph;
 mod test;

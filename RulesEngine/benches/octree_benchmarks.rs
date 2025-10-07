@@ -218,10 +218,11 @@ fn bench_octree_different_theta(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
+    octree_benches,
     bench_octree_creation,
     bench_octree_movement_random_directions,
     bench_octree_force_calculation,
     bench_octree_different_theta,
 );
-criterion_main!(benches);
+
+criterion_main!(octree_benches);
