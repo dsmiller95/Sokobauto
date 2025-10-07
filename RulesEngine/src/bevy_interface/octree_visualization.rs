@@ -6,7 +6,7 @@ use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::pbr::wireframe::Wireframe;
 use bevy::prelude::{default, AlphaMode, Bundle, Commands, Component, Cuboid, Entity, Mut, Query, Res, ResMut, Resource, Sphere, Time, Transform, With, Without};
 use crate::bevy_interface::{GraphNode, PhysicsConfig, PhysicsMode};
-use crate::bevy_interface::octree::{Octree, OctreeVisualizationNode};
+use crate::bevy_interface::octree::{Octree, OctreeResource, OctreeVisualizationNode};
 
 
 #[derive(Component)]
@@ -77,7 +77,7 @@ pub fn setup_octree_visualization(
 
 pub fn update_octree_visualization(
     mut commands: Commands,
-    node_query: Query<&Transform, (With<GraphNode>, Without<OctreeBounds>, Without<OctreeCenterOfMass>)>,
+    octree_resource: Res<OctreeResource>,
     mut bounds_query: Query<(Entity, &mut Transform, &OctreeBounds), (Without<GraphNode>, Without<OctreeCenterOfMass>)>,
     mut center_query: Query<(Entity, &mut Transform, &OctreeCenterOfMass), (Without<GraphNode>, Without<OctreeBounds>)>,
     physics: Res<PhysicsConfig>,
@@ -89,20 +89,7 @@ pub fn update_octree_visualization(
         return;
     }
 
-    let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
-        .enumerate()
-        .map(|(i, transform)| (i, transform.translation))
-        .collect();
-
-    if nodes_data.is_empty() {
-        return;
-    }
-
-    let octree = Octree::from_points(
-        &nodes_data,
-        physics.octree_max_depth,
-        physics.octree_max_points_per_leaf,
-    );
+    let octree = &octree_resource.octree;
 
     let visualization_data = octree.get_visualization_data();
 
