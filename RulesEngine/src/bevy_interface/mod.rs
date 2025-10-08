@@ -437,8 +437,6 @@ fn apply_forces_and_update_octree(
         return;
     }
 
-    println!("Simulating step at t={:.2}", time.elapsed().as_secs_f32());
-
     let dt = time.delta_secs();
     let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
         .map(|(transform, node)| (node.id, transform.translation))
