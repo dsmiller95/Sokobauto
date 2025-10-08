@@ -1,1 +1,1 @@
-﻿ cargo bench --bench all_benchmarks -- --save-baseline main
+﻿cargo bench --bench all_benchmarks -- --save-baseline main

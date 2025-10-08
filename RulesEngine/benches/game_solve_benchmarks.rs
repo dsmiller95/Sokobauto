@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
+use std::time::Duration;
 use RulesEngine::console_interface::parse_level;
 use RulesEngine::state_graph::{StateGraph, UniqueNode, populate_step, get_all_adjacent_nodes, PopulateResult};
 
@@ -33,6 +34,7 @@ const PUZZLES: &[(&str, &str)] = &[
 
 pub fn bench_game_solve_full_graph(c: &mut Criterion) {
     let mut group = c.benchmark_group("game_solve_full_graph");
+    group.measurement_time(Duration::from_secs(10));
 
     for &(puzzle_name, puzzle) in PUZZLES {
         group.bench_with_input(
