@@ -8,13 +8,9 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
         player: from_node.minimum_reachable_player_position,
         environment: from_node.environment.clone(),
     });
-    let actionable_positions: HashSet<Vec2> = from_node.environment.boxes.iter()
-        .flat_map(Vec2::neighbors)
-        .filter(|pos| reachable_positions.contains(pos))
-        .collect();
-    let actions = actionable_positions.into_iter()
-        .flat_map(|pos| UserAction::all_actions().into_iter()
-            .map(move |action| (pos, action)))
+    let actions = from_node.environment.boxes.iter()
+        .flat_map(UserAction::all_push_actions_around)
+        .filter(|(box_pos, _)| reachable_positions.contains(&box_pos))
         .collect::<Vec<_>>();
 
     let next_states: Vec<UniqueNode> = actions.into_iter()

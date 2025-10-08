@@ -1,4 +1,4 @@
-use crate::core::{Cell, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
+use crate::core::{Cell, Direction, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
 use crate::models::Vec2;
 
 pub struct WonCheckHelper {
@@ -112,10 +112,19 @@ impl std::ops::Index<Vec2> for SharedGameState {
 impl UserAction {
     pub fn all_actions() -> Vec<UserAction> {
         vec![
-            UserAction::Move(crate::core::Direction::Up),
-            UserAction::Move(crate::core::Direction::Down),
-            UserAction::Move(crate::core::Direction::Left),
-            UserAction::Move(crate::core::Direction::Right),
+            UserAction::Move(Direction::Up),
+            UserAction::Move(Direction::Down),
+            UserAction::Move(Direction::Left),
+            UserAction::Move(Direction::Right),
+        ]
+    }
+    
+    pub fn all_push_actions_around(pos: &Vec2) -> Vec<(Vec2, UserAction)> {
+        vec![
+            (*pos + Vec2 { i: -1, j: 0 }, UserAction::Move(Direction::Down)),
+            (*pos + Vec2 { i: 1, j: 0 }, UserAction::Move(Direction::Up)),
+            (*pos + Vec2 { i: 0, j: -1 }, UserAction::Move(Direction::Right)),
+            (*pos + Vec2 { i: 0, j: 1 }, UserAction::Move(Direction::Left)),
         ]
     }
 }
