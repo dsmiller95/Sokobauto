@@ -1,27 +1,28 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::arch::x86_64::_mm512_getexp_round_pd;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode, Throughput};
 use std::hint::black_box;
 use std::time::Duration;
 use RulesEngine::console_interface::parse_level;
 use RulesEngine::state_graph::{StateGraph, UniqueNode, populate_step, get_all_adjacent_nodes, PopulateResult};
 
-const PUZZLES: &[(&str, &str)] = &[
+const PUZZLES: &[(&str, &str, usize, SamplingMode)] = &[
     ("puzzle_0", r#"
     ####
     #@$#
     ####
-    "#),
+    "#, 100, SamplingMode::Auto),
     ("puzzle_1", r#"
     ######
     #@$ .#
     ######
-    "#),
+    "#, 100, SamplingMode::Auto),
     ("puzzle_2", r#"
     ######
     #@$  #
     # $. #
     # .  #
     ######
-    "#),
+    "#, 100, SamplingMode::Auto),
     ("puzzle_3", r#"
     ########
     # @$  .#
@@ -29,14 +30,24 @@ const PUZZLES: &[(&str, &str)] = &[
     # .# $ #
     #..#   #
     ########
-    "#),
+    "#, 50, SamplingMode::Auto),
+    ("puzzle_4", r#"
+       ####
+########  ##
+#          ###
+# @$$ ##   ..#
+# $$   ##  ..#
+#         ####
+###########
+"#, 10, SamplingMode::Flat),
 ];
 
 pub fn bench_game_solve_full_graph(c: &mut Criterion) {
     let mut group = c.benchmark_group("game_solve_full_graph");
-    group.measurement_time(Duration::from_secs(10));
 
-    for &(puzzle_name, puzzle) in PUZZLES {
+    for &(puzzle_name, puzzle, sample_size, sample_mode) in PUZZLES {
+        group.sample_size(sample_size);
+        group.sampling_mode(sample_mode);
         group.bench_with_input(
             BenchmarkId::new("complete_graph", puzzle_name),
             &puzzle,
@@ -79,7 +90,9 @@ pub fn bench_game_solve_full_graph(c: &mut Criterion) {
 pub fn bench_game_solve_single_node(c: &mut Criterion) {
     let mut group = c.benchmark_group("game_solve_single_node");
 
-    for &(puzzle_name, puzzle) in PUZZLES {
+    for &(puzzle_name, puzzle, sample_size, sample_mode) in PUZZLES {
+        group.sample_size(sample_size);
+        group.sampling_mode(sample_mode);
         group.bench_with_input(
             BenchmarkId::new("single_node_expansion", puzzle_name),
             &puzzle,
