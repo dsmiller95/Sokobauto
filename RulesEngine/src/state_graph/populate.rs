@@ -4,13 +4,13 @@ use crate::state_graph::Edge;
 use crate::state_graph::models::{PopulateResult, StateGraph, UniqueNode};
 
 pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) -> Vec<UniqueNode> {
-    let reachable_positions = shared.reachable_positions(&GameState {
+    let reachable_positions = shared.reachable_positions_visitation(&GameState {
         player: from_node.minimum_reachable_player_position,
         environment: from_node.environment.clone(),
     });
     let actions = from_node.environment.boxes.iter()
         .flat_map(UserAction::all_push_actions_around)
-        .filter(|(box_pos, _)| reachable_positions.contains(&box_pos))
+        .filter(|(box_pos, _)| reachable_positions.contains(box_pos) && reachable_positions[box_pos].is_reachable())
         .collect::<Vec<_>>();
 
     let next_states: Vec<UniqueNode> = actions.into_iter()

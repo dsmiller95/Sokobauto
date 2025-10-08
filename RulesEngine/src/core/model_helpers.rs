@@ -94,40 +94,52 @@ impl SharedGameState {
         min_reachable
     }
 
-    fn visit_all_reachable_position(&self, game_state: &GameState, mut next_reachable: impl FnMut(&Vec2)) {
+    pub fn reachable_positions_visitation(&self, game_state: &GameState) -> BoundedGrid<VisitationState> {
+        self.visit_all_reachable_position(game_state, |_| {})
+    }
+
+    fn visit_all_reachable_position(&self, game_state: &GameState, mut next_reachable: impl FnMut(&Vec2)) -> BoundedGrid<VisitationState> {
         let mut visited = BoundedGrid::<VisitationState>::new(self.area(), VisitationState::Walkable);
         let mut stack = vec![game_state.player];
 
         for box_pos in &game_state.environment.boxes {
             if box_pos.inside(&self.area()) {
-                visited[*box_pos] = VisitationState::Blocked;
+                visited[box_pos] = VisitationState::Blocked;
             }
         }
 
         while let Some(pos) = stack.pop() {
-            if visited[pos] != VisitationState::Walkable {
+            if visited[&pos] != VisitationState::Walkable {
                 continue;
             }
-            visited[pos] = VisitationState::Visited;
+            visited[&pos] = VisitationState::Visited;
 
             next_reachable(&pos);
 
             for new_pos in pos.neighbors() {
-                if visited.contains(new_pos) &&
-                    visited[new_pos] == VisitationState::Walkable &&
+                if visited.contains(&new_pos) &&
+                    visited[&new_pos] == VisitationState::Walkable &&
                     self[new_pos].is_walkable() {
                     stack.push(new_pos);
                 }
             }
         }
+
+        visited
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum VisitationState {
+pub enum VisitationState {
     Walkable,
     Blocked,
     Visited,
+}
+
+impl VisitationState {
+    pub fn is_reachable(&self) -> bool {
+        *self == VisitationState::Visited
+    }
 }
 
 impl std::ops::Index<Vec2> for SharedGameState {

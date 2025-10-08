@@ -21,21 +21,21 @@ impl<T> BoundedGrid<T> {
         self.size
     }
     
-    pub fn contains(&self, pos: Vec2) -> bool {
+    pub fn contains(&self, pos: &Vec2) -> bool {
         pos.inside(&self.size)
     }
 }
 
-impl<T> std::ops::Index<Vec2> for BoundedGrid<T> {
+impl<T> std::ops::Index<&Vec2> for BoundedGrid<T> {
     type Output = T;
 
-    fn index(&self, index: Vec2) -> &Self::Output {
+    fn index(&self, index: &Vec2) -> &Self::Output {
         &self.cells[(index.i * self.size.j + index.j) as usize]
     }
 }
 
-impl<T> std::ops::IndexMut<Vec2> for BoundedGrid<T> {
-    fn index_mut(&mut self, index: Vec2) -> &mut Self::Output {
+impl<T> std::ops::IndexMut<&Vec2> for BoundedGrid<T> {
+    fn index_mut(&mut self, index: &Vec2) -> &mut Self::Output {
         &mut self.cells[(index.i * self.size.j + index.j) as usize]
     }
 }
