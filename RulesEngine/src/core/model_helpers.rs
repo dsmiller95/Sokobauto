@@ -1,4 +1,5 @@
 use crate::core::{Cell, Direction, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
+use crate::core::bounded_grid::BoundedGrid;
 use crate::models::Vec2;
 
 pub struct WonCheckHelper {
@@ -102,21 +103,21 @@ impl SharedGameState {
 
     pub fn min_reachable_position(&self, game_state: &GameState) -> Vec2 {
         let mut min_reachable = Vec2 { i: i32::MAX, j: i32::MAX };
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = BoundedGrid::<bool>::new(self.area(), false);
         let mut stack = vec![game_state.player];
-        let area = self.area();
 
         while let Some(pos) = stack.pop() {
-            if visited.contains(&pos) {
+            if visited[pos] {
                 continue;
             }
-            visited.insert(pos);
+            visited[pos] = true;
+
             if pos < min_reachable {
                 min_reachable = pos;
             }
 
             for new_pos in pos.neighbors() {
-                if new_pos.inside(&area) &&
+                if visited.contains(new_pos) &&
                     self[new_pos].is_walkable() &&
                     !game_state.environment.boxes.contains(&new_pos) {
                     stack.push(new_pos);
