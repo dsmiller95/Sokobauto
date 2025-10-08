@@ -1,8 +1,11 @@
 # Sokobauto
 
-analysis tools built around sokoban puzzles to enable easier design or possible autogeneration of interesting puzzles.
+analysis tools built around sokoban puzzles to enable easier design or possible autogeneration of interesting puzzles. Also a forde directed graph renderer written in bevy.
 
 Inspired by https://www.youtube.com/watch?v=YGLNyHd2w10
+
+Result of running the program against a moderately complex puzzle:
+![graph renderer example](./_content/game_graph.gif)
 
 ## Setup
 
