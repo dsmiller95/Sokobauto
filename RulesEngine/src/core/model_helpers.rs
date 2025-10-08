@@ -103,14 +103,20 @@ impl SharedGameState {
 
     pub fn min_reachable_position(&self, game_state: &GameState) -> Vec2 {
         let mut min_reachable = Vec2 { i: i32::MAX, j: i32::MAX };
-        let mut visited = BoundedGrid::<bool>::new(self.area(), false);
+        let mut visited = BoundedGrid::<VisitationState>::new(self.area(), VisitationState::Walkable);
         let mut stack = vec![game_state.player];
 
+        for box_pos in &game_state.environment.boxes {
+            if box_pos.inside(&self.area()) {
+                visited[*box_pos] = VisitationState::Blocked;
+            }
+        }
+
         while let Some(pos) = stack.pop() {
-            if visited[pos] {
+            if visited[pos] != VisitationState::Walkable {
                 continue;
             }
-            visited[pos] = true;
+            visited[pos] = VisitationState::Visited;
 
             if pos < min_reachable {
                 min_reachable = pos;
@@ -118,8 +124,8 @@ impl SharedGameState {
 
             for new_pos in pos.neighbors() {
                 if visited.contains(new_pos) &&
-                    self[new_pos].is_walkable() &&
-                    !game_state.environment.boxes.contains(&new_pos) {
+                    visited[new_pos] == VisitationState::Walkable &&
+                    self[new_pos].is_walkable() {
                     stack.push(new_pos);
                 }
             }
@@ -127,6 +133,13 @@ impl SharedGameState {
 
         min_reachable
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum VisitationState {
+    Walkable,
+    Blocked,
+    Visited,
 }
 
 impl std::ops::Index<Vec2> for SharedGameState {
