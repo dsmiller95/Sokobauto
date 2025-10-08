@@ -36,13 +36,10 @@ cd RulesEngine
 cargo run interactive
 ```
 
-Then generate the state graph and start the web app to view it.
+Then generate the state graph and view it in the native bevy application. Be sure to run in release mode, this easily 10x the runtime speed.
 The generation can take a long time and produce a large graph for even moderately complex puzzles.
 If the graph is too large, try to reduce the number of different valid states the puzzle can be in.
-The UI can handle around 10k nodes OK, if using the Cosmos frontend. The 3d-force-graph frontend hits a limit around 1k nodes.
 ```bash
 cd RulesEngine
-cargo run graph
-cd ../graph-view
-npm run dev
+cargo run --release graph
 ```
