@@ -1,5 +1,6 @@
+use std::hint::black_box;
 use crate::core::Cell::{Wall};
-use crate::core::{Direction, GameChangeType, GameState, GameStateEnvironment, GameUpdate, SharedGameState, UserAction, Vec2};
+use crate::core::{Direction, GameChangeType, GameState, GameStateEnvironment, GameUpdate, SharedGameState, UserAction, Vec2, DEDUPLICATE_BOXES};
 
 pub fn step(
     shared: &SharedGameState,
@@ -45,7 +46,9 @@ pub fn step(
         }
 
         new_boxes[pushed_box_index] = new_box_pos;
-        new_boxes.sort()
+        if black_box(DEDUPLICATE_BOXES) {
+            new_boxes.sort()
+        }
     } else {
         if dest == Wall {
             return GameUpdate::Error("Cannot walk into a wall".to_string());

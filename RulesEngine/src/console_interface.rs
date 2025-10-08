@@ -1,4 +1,5 @@
-use crate::core::{Direction, GameState, GameStateEnvironment, SharedGameState, UserAction};
+use std::hint::black_box;
+use crate::core::{Direction, GameState, GameStateEnvironment, SharedGameState, UserAction, DEDUPLICATE_BOXES};
 use crate::models::Cell::{
     Floor, Target, Wall,
 };
@@ -72,6 +73,10 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
         i += 1;
     }
 
+
+    if black_box(DEDUPLICATE_BOXES) {
+        boxes.sort()
+    }
     (
         GameState {
             player,

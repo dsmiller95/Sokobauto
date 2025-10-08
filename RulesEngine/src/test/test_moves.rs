@@ -1,5 +1,6 @@
 ﻿
 mod test {
+    use std::hint::black_box;
     use Direction::*;
     use crate::core::*;
     use crate::test::test_util::GameTestState;
@@ -36,7 +37,6 @@ mod test {
 "#;
         game.assert_matches(expected_level);
     }
-
 
     #[test]
     fn when_block_pushed_into_block_remains_two_blocks(){
@@ -88,7 +88,7 @@ mod test {
     }
 
     #[test]
-    fn when_blocks_swap_game_remains_equal(){
+    fn when_blocks_swap_game_correct_equality(){
         let level = r#"
 #    #
 #@$  #
@@ -122,6 +122,10 @@ mod test {
 "#;
         game.assert_matches(expected_level);
 
-        assert_eq!(original_state, new_state);
+        if black_box(DEDUPLICATE_BOXES) {
+            assert_eq!(original_state, new_state);
+        } else {
+            assert_ne!(original_state, new_state);
+        }
     }
 }
