@@ -99,6 +99,33 @@ impl SharedGameState {
 
         reachable
     }
+
+    pub fn min_reachable_position(&self, game_state: &GameState) -> Vec2 {
+        let mut min_reachable = Vec2 { i: i32::MAX, j: i32::MAX };
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = vec![game_state.player];
+        let area = self.area();
+
+        while let Some(pos) = stack.pop() {
+            if visited.contains(&pos) {
+                continue;
+            }
+            visited.insert(pos);
+            if pos < min_reachable {
+                min_reachable = pos;
+            }
+
+            for new_pos in pos.neighbors() {
+                if new_pos.inside(&area) &&
+                    self[new_pos].is_walkable() &&
+                    !game_state.environment.boxes.contains(&new_pos) {
+                    stack.push(new_pos);
+                }
+            }
+        }
+
+        min_reachable
+    }
 }
 
 impl std::ops::Index<Vec2> for SharedGameState {
@@ -126,6 +153,12 @@ impl UserAction {
             (*pos + Vec2 { i: 0, j: -1 }, UserAction::Move(Direction::Right)),
             (*pos + Vec2 { i: 0, j: 1 }, UserAction::Move(Direction::Left)),
         ]
+    }
+}
+
+impl Default for Vec2 {
+    fn default() -> Self {
+        Vec2 { i: 0, j: 0 }
     }
 }
 

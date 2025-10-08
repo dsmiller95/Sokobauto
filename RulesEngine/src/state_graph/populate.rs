@@ -27,8 +27,7 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
                 return None;
             }
 
-            let min_reachable_position = shared.reachable_positions(&new_state)
-                .into_iter().min().unwrap();
+            let min_reachable_position = shared.min_reachable_position(&new_state);
             let new_node = UniqueNode {
                 environment: new_state.environment,
                 minimum_reachable_player_position: min_reachable_position,
