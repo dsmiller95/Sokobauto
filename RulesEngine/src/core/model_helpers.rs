@@ -138,23 +138,18 @@ impl std::ops::Index<Vec2> for SharedGameState {
     }
 }
 
+const ALL_PUSH_ACTIONS_AROUND: &[(Vec2, UserAction)] = &[
+    (Vec2 { i: -1, j: 0 }, UserAction::Move(Direction::Down)),
+    (Vec2 { i: 1, j: 0 }, UserAction::Move(Direction::Up)),
+    (Vec2 { i: 0, j: -1 }, UserAction::Move(Direction::Right)),
+    (Vec2 { i: 0, j: 1 }, UserAction::Move(Direction::Left)),
+];
+
 impl UserAction {
-    pub fn all_actions() -> Vec<UserAction> {
-        vec![
-            UserAction::Move(Direction::Up),
-            UserAction::Move(Direction::Down),
-            UserAction::Move(Direction::Left),
-            UserAction::Move(Direction::Right),
-        ]
-    }
-    
-    pub fn all_push_actions_around(pos: &Vec2) -> Vec<(Vec2, UserAction)> {
-        vec![
-            (*pos + Vec2 { i: -1, j: 0 }, UserAction::Move(Direction::Down)),
-            (*pos + Vec2 { i: 1, j: 0 }, UserAction::Move(Direction::Up)),
-            (*pos + Vec2 { i: 0, j: -1 }, UserAction::Move(Direction::Right)),
-            (*pos + Vec2 { i: 0, j: 1 }, UserAction::Move(Direction::Left)),
-        ]
+    pub fn all_push_actions_around(&pos: &Vec2) -> impl Iterator<Item=(Vec2, UserAction)> {
+        ALL_PUSH_ACTIONS_AROUND.iter().map(move |&(neighbor, action)| {
+            (neighbor + pos, action)
+        })
     }
 }
 
