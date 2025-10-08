@@ -19,6 +19,9 @@ bevy_panorbit_camera = "0.29"
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["html_reports"] }
 
+[profile.bench]
+debug = true
+
 [[bench]]
 name = "all_benchmarks"
 harness = false
