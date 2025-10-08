@@ -78,31 +78,23 @@ impl SharedGameState {
 
     pub fn reachable_positions(&self, game_state: &GameState) -> Vec<Vec2> {
         let mut reachable = Vec::new();
-        let mut visited = std::collections::HashSet::new();
-        let mut stack = vec![game_state.player];
-        let area = self.area();
-
-        while let Some(pos) = stack.pop() {
-            if visited.contains(&pos) {
-                continue;
-            }
-            visited.insert(pos);
-            reachable.push(pos);
-
-            for new_pos in pos.neighbors() {
-                if new_pos.inside(&area) {
-                    if self[new_pos].is_walkable() && !game_state.environment.boxes.contains(&new_pos) {
-                        stack.push(new_pos);
-                    }
-                }
-            }
-        }
-
+        self.visit_all_reachable_position(game_state, |pos| {
+            reachable.push(*pos);
+        });
         reachable
     }
 
     pub fn min_reachable_position(&self, game_state: &GameState) -> Vec2 {
         let mut min_reachable = Vec2 { i: i32::MAX, j: i32::MAX };
+        self.visit_all_reachable_position(game_state, |pos| {
+            if pos < &min_reachable {
+                min_reachable = *pos;
+            }
+        });
+        min_reachable
+    }
+
+    fn visit_all_reachable_position(&self, game_state: &GameState, mut next_reachable: impl FnMut(&Vec2)) {
         let mut visited = BoundedGrid::<VisitationState>::new(self.area(), VisitationState::Walkable);
         let mut stack = vec![game_state.player];
 
@@ -118,9 +110,7 @@ impl SharedGameState {
             }
             visited[pos] = VisitationState::Visited;
 
-            if pos < min_reachable {
-                min_reachable = pos;
-            }
+            next_reachable(&pos);
 
             for new_pos in pos.neighbors() {
                 if visited.contains(new_pos) &&
@@ -130,8 +120,6 @@ impl SharedGameState {
                 }
             }
         }
-
-        min_reachable
     }
 }
 
