@@ -6,7 +6,6 @@ use RulesEngine::bevy_interface::octree::{Octree};
 use bevy::prelude::Vec3;
 use rand::prelude::*;
 use rand::SeedableRng;
-use RulesEngine::utils::{checker_board};
 
 fn generate_random_points(count: usize, bounds_size: f32, rng: &mut impl RngCore) -> Vec<(usize, Vec3)> {
     let mut points = Vec::new();
@@ -145,12 +144,16 @@ fn bench_octree_force_calculation(c: &mut Criterion) {
             |b, _| {
                 b.iter_with_setup(
                     || {
-                        let checker_size = BOUNDS_SIZE / 10.0;
-                        let points = generate_random_points(node_count, BOUNDS_SIZE, &mut rng).into_iter().map(|(id, pos)| {
-                            (id, checker_board(pos, checker_size, false))
-                        }).collect::<Vec<_>>();
+                        // let checker_size = BOUNDS_SIZE / 10.0;
+                        let points = generate_random_points(node_count, BOUNDS_SIZE, &mut rng);
                         let moved_points = generate_random_points(node_count, BOUNDS_SIZE, &mut rng).into_iter().map(|(id, pos)| {
-                            (id, checker_board(pos, checker_size, true))
+                            let should_keep = (pos.x % 5.0 < 0.1) && (pos.y % 5.0 < 0.1) && (pos.z % 5.0 < 0.1);
+                            if should_keep {
+                                (id, pos)
+                            } else {
+                                // round to super-dense cell at 1,1,1
+                                (id, pos / BOUNDS_SIZE)
+                            }
                         }).collect::<Vec<_>>();
                         let mut octree = Octree::from_points(&points, 8, 10);
                         for (id, new_pos) in moved_points {

@@ -4,4 +4,3 @@ pub mod bevy_interface;
 pub mod core;
 pub mod state_graph;
 mod test;
-pub mod utils;
