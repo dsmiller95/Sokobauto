@@ -164,6 +164,28 @@ fn setup_scene(
 
 const DEFAULT_NODE_SPHERE_SIZE: f32 = 0.8;
 
+fn on_config_changed(
+    trigger: On<ConfigChangedEvent>,
+    mut commands: Commands,
+    shared_meshes: Res<ReusedMeshes>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    config: Res<OctreeVisualizationConfig>,
+    user_config: Res<UserConfig>,
+) {
+    match &trigger.event().config_type {
+        ConfigType::Slider(SliderType::NodeSizeMultiplier) => {
+            let new_multiplier = user_config.node_size_multiplier;
+
+            let node_mesh_handle = shared_meshes.node_mesh.clone();
+            let node_mesh = meshes.get_mut(&node_mesh_handle).unwrap();
+
+            let mesh_size = DEFAULT_NODE_SPHERE_SIZE * new_multiplier;
+            *node_mesh = Sphere::new(mesh_size).mesh().ico(0).unwrap();
+        }
+        _ => {}
+    }
+}
+
 fn setup_graph_from_data(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -291,28 +313,6 @@ fn setup_graph_from_data(
     
     commands.insert_resource(NodePositions { positions: node_positions });
     commands.insert_resource(ReusedMeshes { node_mesh });
-}
-
-fn on_config_changed(
-    trigger: On<ConfigChangedEvent>,
-    mut commands: Commands,
-    shared_meshes: Res<ReusedMeshes>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    config: Res<OctreeVisualizationConfig>,
-    user_config: Res<UserConfig>,
-) {
-    match &trigger.event().config_type {
-        ConfigType::Slider(SliderType::NodeSizeMultiplier) => {
-            let new_multiplier = user_config.node_size_multiplier;
-
-            let node_mesh_handle = shared_meshes.node_mesh.clone();
-            let node_mesh = meshes.get_mut(&node_mesh_handle).unwrap();
-
-            let mesh_size = DEFAULT_NODE_SPHERE_SIZE * new_multiplier;
-            *node_mesh = Sphere::new(mesh_size).mesh().ico(0).unwrap();
-        }
-        _ => {}
-    }
 }
 
 fn setup_octree_resource(

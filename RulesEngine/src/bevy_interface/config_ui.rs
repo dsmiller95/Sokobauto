@@ -2,7 +2,7 @@ use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::math::FloatPow;
 use bevy::prelude::*;
-use super::{OctreeVisualizationConfig, UserConfig};
+use super::{OctreeVisualizationConfig, PhysicsConfig, UserConfig};
 
 #[derive(Component)]
 pub struct ConfigPanel;
@@ -19,6 +19,10 @@ pub enum ToggleType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliderType {
     NodeSizeMultiplier,
+    RepulsionStrength,
+    AttractionStrength,
+    Damping,
+    OctreeTheta,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,30 +111,50 @@ impl SliderType {
     pub fn all_types() -> &'static [SliderType] {
         &[
             SliderType::NodeSizeMultiplier,
+            SliderType::RepulsionStrength,
+            SliderType::AttractionStrength,
+            SliderType::Damping,
+            SliderType::OctreeTheta,
         ]
     }
 
     pub fn label(&self) -> &'static str {
         match self {
             SliderType::NodeSizeMultiplier => "Node Size",
+            SliderType::RepulsionStrength => "Repulsion Str",
+            SliderType::AttractionStrength => "Attraction Str",
+            SliderType::Damping => "Damping",
+            SliderType::OctreeTheta => "Octree Theta",
         }
     }
 
-    pub fn get_value(&self, config: &OctreeVisualizationConfig, user_config: &UserConfig) -> f32 {
+    pub fn get_value(&self, config: &OctreeVisualizationConfig, user_config: &UserConfig, physics_config: &PhysicsConfig) -> f32 {
         match self {
             SliderType::NodeSizeMultiplier => user_config.node_size_multiplier.sqrt(),
+            SliderType::RepulsionStrength => physics_config.repulsion_strength,
+            SliderType::AttractionStrength => physics_config.attraction_strength,
+            SliderType::Damping => physics_config.damping,
+            SliderType::OctreeTheta => physics_config.octree_theta,
         }
     }
 
-    pub fn set_value(&self, config: &mut OctreeVisualizationConfig, user_config: &mut UserConfig, value: f32) {
+    pub fn set_value(&self, config: &mut OctreeVisualizationConfig, user_config: &mut UserConfig, physics_config: &mut PhysicsConfig, value: f32) {
         match self {
             SliderType::NodeSizeMultiplier => user_config.node_size_multiplier = value.squared(),
+            SliderType::RepulsionStrength => physics_config.repulsion_strength = value,
+            SliderType::AttractionStrength => physics_config.attraction_strength = value,
+            SliderType::Damping => physics_config.damping = value,
+            SliderType::OctreeTheta => physics_config.octree_theta = value,
         }
     }
 
     pub fn range(&self) -> (f32, f32) {
         match self {
             SliderType::NodeSizeMultiplier => (0.1, 5.0),
+            SliderType::RepulsionStrength => (10.0, 100.0),
+            SliderType::AttractionStrength => (0.1, 10.0),
+            SliderType::Damping => (0.1, 1.0),
+            SliderType::OctreeTheta => (0.2, 1.0),
         }
     }
 }
@@ -168,7 +192,7 @@ const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 const ACTIVE_BUTTON: Color = Color::srgb(0.2, 0.6, 0.2);
 
-pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<OctreeVisualizationConfig>, user_config: Res<UserConfig>) {
+pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<OctreeVisualizationConfig>, user_config: Res<UserConfig>, physics_config: Res<PhysicsConfig>) {
     // Root UI container
     commands
         .spawn((
@@ -195,7 +219,7 @@ pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<Octr
             }
 
             for &slider_type in SliderType::all_types() {
-                let initial_value = slider_type.get_value(&visualization_config, &user_config);
+                let initial_value = slider_type.get_value(&visualization_config, &user_config, &physics_config);
                 create_slider_row(parent, initial_value, slider_type);
             }
         });
@@ -344,7 +368,8 @@ fn create_slider_row(
                 mut node_query: Query<&mut Node, With<ConfigSliderHandle>>,
                 mut commands: Commands,
                 config: ResMut<OctreeVisualizationConfig>,
-                user_config: ResMut<UserConfig>,
+                user_config: Res<UserConfig>,
+                physics_config: Res<PhysicsConfig>,
             | {
                 try_entity_errors(|| {
                     let (computed_node, children, config_slider) = slider_query.get_mut(drag.entity)?;
@@ -352,7 +377,7 @@ fn create_slider_row(
 
                     let normalized_value_change = (drag.delta.x / (computed_node.size.x));
 
-                    let current_value = config_slider.slider_type.get_value(&config, &user_config);
+                    let current_value = config_slider.slider_type.get_value(&config, &user_config, &physics_config);
                     let change_in_value = range.size() * normalized_value_change;
                     let new_value = range.clamp(current_value + change_in_value);
 
@@ -450,14 +475,15 @@ pub fn on_slider_event(
     mut commands: Commands,
     mut config: ResMut<OctreeVisualizationConfig>,
     mut user_config: ResMut<UserConfig>,
+    mut physics_config: ResMut<PhysicsConfig>,
 ) {
     let slider_type = trigger.event().slider_type;
     let value = trigger.event().new_value;
-    slider_type.set_value(&mut config, &mut user_config, value);
+    slider_type.set_value(&mut config, &mut user_config, &mut physics_config, value);
 
     commands.trigger(ConfigChangedEvent {
         config_type: ConfigType::Slider(slider_type),
     });
 
-    println!("Set {:?} to {}", slider_type, slider_type.get_value(&config, &user_config));
+    println!("Set {:?} to {}", slider_type, slider_type.get_value(&config, &user_config, &physics_config));
 }
