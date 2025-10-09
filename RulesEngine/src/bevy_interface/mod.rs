@@ -17,9 +17,7 @@ use bevy::pbr::wireframe::{WireframePlugin};
 use crate::bevy_interface::bounds::Bounds;
 use crate::bevy_interface::spatial_hash::SpatialHash;
 use crate::bevy_interface::octree::{Octree, OctreeResource};
-use crate::bevy_interface::config_ui::{
-    setup_config_panel, handle_toggle_interactions, on_toggle_event
-};
+use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interactions, on_toggle_event, on_slider_event};
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
@@ -76,6 +74,7 @@ struct PhysicsConfig {
 #[derive(Resource)]
 struct UserConfig {
     force_simulation_enabled: bool,
+    node_size_multiplier: f32,
 }
 
 impl UserConfig {
@@ -92,6 +91,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
     let graph_data = GraphData::from_state_graph(graph, shared);
     let user_config = UserConfig {
         force_simulation_enabled: false,
+        node_size_multiplier: 1.0,
     };
 
     let mut app = App::new();
@@ -134,7 +134,9 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             .add_systems(Update, update_shader_edge_data);
     }
 
-    app.add_observer(on_toggle_event)
+    app
+        .add_observer(on_toggle_event)
+        .add_observer(on_slider_event)
         .run();
 }
 
