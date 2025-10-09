@@ -188,19 +188,6 @@ pub fn setup_config_panel(mut commands: Commands, visualization_config: Res<Octr
             ConfigPanel,
         ))
         .with_children(|parent| {
-            // Panel title
-            parent.spawn((
-                Text::new("Octree Visualization"),
-                TextFont {
-                    font_size: 18.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Node {
-                    margin: UiRect::bottom(Val::Px(10.0)),
-                    ..default()
-                },
-            ));
 
             for &toggle_type in ToggleType::all_types() {
                 let initial_state = toggle_type.get_value(&visualization_config, &user_config);
