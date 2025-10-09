@@ -13,6 +13,7 @@ pub enum ToggleType {
     CenterOfMass,
     LeafOnly,
     ForceSimulate,
+    DisableRendering,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +63,7 @@ impl ToggleType {
             ToggleType::CenterOfMass,
             ToggleType::LeafOnly,
             ToggleType::ForceSimulate,
+            ToggleType::DisableRendering,
         ]
     }
     
@@ -71,6 +73,7 @@ impl ToggleType {
             ToggleType::CenterOfMass => "Show Center of Mass",
             ToggleType::LeafOnly => "Show Leaf Only",
             ToggleType::ForceSimulate => "Force Simulation On",
+            ToggleType::DisableRendering => "Disable Rendering",
         }
     }
 
@@ -80,6 +83,7 @@ impl ToggleType {
             ToggleType::CenterOfMass => config.show_center_of_mass,
             ToggleType::LeafOnly => config.show_leaf_only,
             ToggleType::ForceSimulate => user_config.force_simulation_enabled,
+            ToggleType::DisableRendering => user_config.disable_rendering,
         }
     }
 
@@ -89,6 +93,7 @@ impl ToggleType {
             ToggleType::CenterOfMass => config.show_center_of_mass = value,
             ToggleType::LeafOnly => config.show_leaf_only = value,
             ToggleType::ForceSimulate => user_config.force_simulation_enabled = value,
+            ToggleType::DisableRendering => user_config.disable_rendering = value,
         }
     }
 

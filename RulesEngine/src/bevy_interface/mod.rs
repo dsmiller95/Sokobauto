@@ -74,6 +74,7 @@ struct PhysicsConfig {
 #[derive(Resource)]
 struct UserConfig {
     force_simulation_enabled: bool,
+    disable_rendering: bool,
     node_size_multiplier: f32,
 }
 
@@ -90,12 +91,16 @@ impl UserConfig {
         physics_config.physics_mode != PhysicsMode::Octree ||
             self.is_simulation_disabled(time)
     }
+    fn is_rendering_disabled(&self) -> bool {
+        self.disable_rendering
+    }
 }
 
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
     let graph_data = GraphData::from_state_graph(graph, shared);
     let user_config = UserConfig {
         force_simulation_enabled: false,
+        disable_rendering: false,
         node_size_multiplier: 1.0,
     };
 
@@ -377,7 +382,7 @@ fn on_config_changed(
 
             let node_mesh_handle = shared_meshes.node_mesh.clone();
             let node_mesh = meshes.get_mut(&node_mesh_handle).unwrap();
-            
+
             let mesh_size = DEFAULT_NODE_SPHERE_SIZE * new_multiplier;
             *node_mesh = Sphere::new(mesh_size).mesh().ico(0).unwrap();
         }
@@ -546,7 +551,7 @@ fn update_edges(
     time: Res<Time>,
     user_config: Res<UserConfig>,
 ) {
-    if user_config.is_simulation_disabled(&time) || USE_SHADER_EDGES {
+    if user_config.is_rendering_disabled() || user_config.is_simulation_disabled(&time) || USE_SHADER_EDGES {
         return;
     }
     for (mut transform, edge) in edge_query.iter_mut() {
@@ -566,7 +571,7 @@ fn update_shader_edge_data(
     time: Res<Time>,
     user_config: Res<UserConfig>,
 ) {
-    if user_config.is_simulation_disabled(&time) {
+    if user_config.is_rendering_disabled() || user_config.is_simulation_disabled(&time) {
         return;
     }
 
