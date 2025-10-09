@@ -1,5 +1,6 @@
 use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
+use bevy::math::FloatPow;
 use bevy::prelude::*;
 use super::{OctreeVisualizationConfig, UserConfig};
 
@@ -17,6 +18,12 @@ pub enum ToggleType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliderType {
     NodeSizeMultiplier,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigType {
+    Toggle(ToggleType),
+    Slider(SliderType),
 }
 
 #[derive(Component)]
@@ -41,6 +48,11 @@ pub struct ConfigSliderHandle;
 pub struct SliderEvent {
     pub slider_type: SliderType,
     pub new_value: f32,
+}
+
+#[derive(Event)]
+pub struct ConfigChangedEvent {
+    pub config_type: ConfigType,
 }
 
 impl ToggleType {
@@ -101,13 +113,13 @@ impl SliderType {
 
     pub fn get_value(&self, config: &OctreeVisualizationConfig, user_config: &UserConfig) -> f32 {
         match self {
-            SliderType::NodeSizeMultiplier => user_config.node_size_multiplier,
+            SliderType::NodeSizeMultiplier => user_config.node_size_multiplier.sqrt(),
         }
     }
 
     pub fn set_value(&self, config: &mut OctreeVisualizationConfig, user_config: &mut UserConfig, value: f32) {
         match self {
-            SliderType::NodeSizeMultiplier => user_config.node_size_multiplier = value,
+            SliderType::NodeSizeMultiplier => user_config.node_size_multiplier = value.squared(),
         }
     }
 
@@ -427,21 +439,33 @@ pub fn handle_toggle_interactions(
 
 pub fn on_toggle_event(
     trigger: On<ToggleEvent>,
+    mut commands: Commands,
     mut config: ResMut<OctreeVisualizationConfig>,
     mut user_config: ResMut<UserConfig>,
 ) {
     let toggle_type = trigger.event().toggle_type;
     toggle_type.toggle_value(&mut config, &mut user_config);
+
+    commands.trigger(ConfigChangedEvent {
+        config_type: ConfigType::Toggle(toggle_type),
+    });
+
     println!("Toggled {:?}: {}", toggle_type, toggle_type.get_value(&config, &user_config));
 }
 
 pub fn on_slider_event(
     trigger: On<SliderEvent>,
+    mut commands: Commands,
     mut config: ResMut<OctreeVisualizationConfig>,
     mut user_config: ResMut<UserConfig>,
 ) {
     let slider_type = trigger.event().slider_type;
     let value = trigger.event().new_value;
     slider_type.set_value(&mut config, &mut user_config, value);
+
+    commands.trigger(ConfigChangedEvent {
+        config_type: ConfigType::Slider(slider_type),
+    });
+
     println!("Set {:?} to {}", slider_type, slider_type.get_value(&config, &user_config));
 }

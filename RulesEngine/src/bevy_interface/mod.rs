@@ -17,7 +17,7 @@ use bevy::pbr::wireframe::{WireframePlugin};
 use crate::bevy_interface::bounds::Bounds;
 use crate::bevy_interface::spatial_hash::SpatialHash;
 use crate::bevy_interface::octree::{Octree, OctreeResource};
-use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interactions, on_toggle_event, on_slider_event};
+use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interactions, on_toggle_event, on_slider_event, SliderEvent, ConfigChangedEvent, ConfigType, SliderType};
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
@@ -75,6 +75,11 @@ struct PhysicsConfig {
 struct UserConfig {
     force_simulation_enabled: bool,
     node_size_multiplier: f32,
+}
+
+#[derive(Resource)]
+struct ReusedMeshes {
+    node_mesh: Handle<Mesh>,
 }
 
 impl UserConfig {
@@ -137,6 +142,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
     app
         .add_observer(on_toggle_event)
         .add_observer(on_slider_event)
+        .add_observer(on_config_changed)
         .run();
 }
 
@@ -226,6 +232,8 @@ fn setup_scene(
     ));
 }
 
+const DEFAULT_NODE_SPHERE_SIZE: f32 = 0.8;
+
 fn setup_graph_from_data(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -235,7 +243,7 @@ fn setup_graph_from_data(
     let mut rng = rand::thread_rng();
     let mut node_positions = HashMap::new();
 
-    let node_mesh = meshes.add(Sphere::new(0.8).mesh().ico(0).unwrap());
+    let node_mesh = meshes.add(Sphere::new(DEFAULT_NODE_SPHERE_SIZE).mesh().ico(0).unwrap());
 
     let node_materials = (0..=graph_data.max_on_targets).map(|on_targets| {
         let color = interpolate_color(on_targets, graph_data.max_on_targets);
@@ -352,6 +360,29 @@ fn setup_graph_from_data(
     }
     
     commands.insert_resource(NodePositions { positions: node_positions });
+    commands.insert_resource(ReusedMeshes { node_mesh });
+}
+
+fn on_config_changed(
+    trigger: On<ConfigChangedEvent>,
+    mut commands: Commands,
+    shared_meshes: Res<ReusedMeshes>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    config: Res<OctreeVisualizationConfig>,
+    user_config: Res<UserConfig>,
+) {
+    match &trigger.event().config_type {
+        ConfigType::Slider(SliderType::NodeSizeMultiplier) => {
+            let new_multiplier = user_config.node_size_multiplier;
+
+            let node_mesh_handle = shared_meshes.node_mesh.clone();
+            let node_mesh = meshes.get_mut(&node_mesh_handle).unwrap();
+            
+            let mesh_size = DEFAULT_NODE_SPHERE_SIZE * new_multiplier;
+            *node_mesh = Sphere::new(mesh_size).mesh().ico(0).unwrap();
+        }
+        _ => {}
+    }
 }
 
 fn setup_octree_resource(
