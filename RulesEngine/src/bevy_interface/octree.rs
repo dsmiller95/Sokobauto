@@ -1,6 +1,7 @@
 use bevy::prelude::Resource;
 use bevy::prelude::*;
 use crate::bevy_interface::bounds::Bounds;
+use crate::bevy_interface::octree::OctreeChildren::{Points, SubNodes};
 
 #[derive(Resource)]
 pub struct OctreeResource {
@@ -19,8 +20,36 @@ pub struct OctreeNode {
     pub center_of_mass: Vec3,
     pub total_mass: f32,
     pub node_count: usize,
-    pub children: Option<Box<[OctreeNode; 8]>>,
-    pub points: Vec<(usize, Vec3)>,
+    pub children: OctreeChildren,
+}
+
+#[derive(Debug, Clone)]
+pub enum OctreeChildren {
+    SubNodes(Box<[OctreeNode; 8]>),
+    Points(Vec<(usize, Vec3)>),
+}
+
+impl OctreeChildren {
+    pub fn is_leaf(&self) -> bool {
+        matches!(self, Points(_))
+    }
+    pub fn has_subnodes(&self) -> bool {
+        matches!(self, SubNodes(_))
+    }
+
+    pub fn try_subnodes(&self) -> Option<&Box<[OctreeNode; 8]>> {
+        match self {
+            SubNodes(children) => Some(children),
+            _ => None,
+        }
+    }
+
+    pub fn try_points(&self) -> Option<&Vec<(usize, Vec3)>> {
+        match self {
+            Points(points) => Some(points),
+            _ => None,
+        }
+    }
 }
 
 
@@ -149,21 +178,25 @@ impl Octree {
 
         // Otherwise, recurse into children
         let mut total_force = Vec3::ZERO;
-        if node.is_leaf() {
-            for &(_, point_pos) in &node.points {
-                let point_diff = position - point_pos;
-                let point_distance = point_diff.length();
-                if point_distance < MINIMUM_DISTANCE {
-                    // TODO: handle self-force or very close points differently. take in a node ID to compare?
-                    continue;
+
+        match &node.children {
+            Points(points) => {
+                for &(_, point_pos) in points {
+                    let point_diff = position - point_pos;
+                    let point_distance = point_diff.length();
+                    if point_distance < MINIMUM_DISTANCE {
+                        // TODO: handle self-force or very close points differently. take in a node ID to compare?
+                        continue;
+                    }
+                    let force_magnitude = NODE_MASS * repulsion_strength / (point_distance * point_distance);
+                    total_force += point_diff.normalize() * force_magnitude;
                 }
-                let force_magnitude = NODE_MASS * repulsion_strength / (point_distance * point_distance);
-                total_force += point_diff.normalize() * force_magnitude;
             }
-        } else if let Some(ref children) = node.children {
-            for child in children.iter() {
-                total_force += self.calculate_force_recursive(child, position, theta, repulsion_strength);
-            }
+            SubNodes(children) => {
+                for child in children.iter() {
+                    total_force += self.calculate_force_recursive(child, position, theta, repulsion_strength);
+                }
+            },
         }
 
         total_force
@@ -186,17 +219,27 @@ impl Octree {
             return;
         }
 
-        data.push(OctreeVisualizationNode {
-            bounds: node.bounds,
-            center_of_mass: node.center_of_mass,
-            total_mass: node.total_mass,
-            depth,
-            is_leaf: node.is_leaf(),
-        });
-
-        if let Some(ref children) = node.children {
-            for child in children.iter() {
-                self.collect_visualization_recursive(child, depth + 1, data);
+        match &node.children {
+            Points(_) => {
+                data.push(OctreeVisualizationNode {
+                    bounds: node.bounds,
+                    center_of_mass: node.center_of_mass,
+                    total_mass: node.total_mass,
+                    depth,
+                    is_leaf: true,
+                });
+            },
+            SubNodes(children) => {
+                data.push(OctreeVisualizationNode {
+                    bounds: node.bounds,
+                    center_of_mass: node.center_of_mass,
+                    total_mass: node.total_mass,
+                    depth,
+                    is_leaf: false,
+                });
+                for child in children.iter() {
+                    self.collect_visualization_recursive(child, depth + 1, data);
+                }
             }
         }
     }
@@ -209,13 +252,8 @@ impl OctreeNode {
             center_of_mass: Vec3::ZERO,
             total_mass: 0.0,
             node_count: 0,
-            children: None,
-            points: Vec::new(),
+            children: Points(Vec::new()),
         }
-    }
-
-    pub fn is_leaf(&self) -> bool {
-        self.children.is_none()
     }
 
     pub fn insert(&mut self, node_id: usize, position: Vec3, mass: f32, max_depth: usize, max_points_per_leaf: usize) {
@@ -228,81 +266,92 @@ impl OctreeNode {
         self.total_mass = total_mass;
         self.node_count += 1;
 
-        if self.is_leaf() {
-            self.points.push((node_id, position));
+        match &mut self.children {
+            Points(points) => {
+                points.push((node_id, position));
 
-            if self.points.len() > max_points_per_leaf && max_depth > 0 {
-                self.subdivide(max_depth - 1, max_points_per_leaf);
-            }
-        } else {
-            let octant_index = self.bounds.octant_index(position);
-            if let Some(ref mut children) = self.children {
+                if points.len() > max_points_per_leaf && max_depth > 0 {
+                    self.subdivide(max_depth - 1, max_points_per_leaf);
+                }
+            },
+            SubNodes(children) => {
+                let octant_index = self.bounds.octant_index(position);
                 children[octant_index].insert(node_id, position, mass, max_depth - 1, max_points_per_leaf);
-            }
+            },
         }
     }
 
     fn subdivide(&mut self, remaining_depth: usize, max_points_per_leaf: usize) {
-        let mut children = Vec::with_capacity(8);
+        let Points(points) = &mut self.children else {
+            eprintln!("Attempted to subdivide a node that is already subdivided.");
+            return;
+        };
+        let points = std::mem::take(points);
+
+        let mut children =  Vec::with_capacity(8);
         for i in 0..8 {
             children.push(OctreeNode::new(self.bounds.octant(i)));
         }
-        self.children = Some(children.try_into().unwrap());
 
-        let points = std::mem::take(&mut self.points);
         for (node_id, position) in points {
             let octant_index = self.bounds.octant_index(position);
-            if let Some(ref mut children) = self.children {
-                children[octant_index].insert(node_id, position, NODE_MASS, remaining_depth, max_points_per_leaf);
-            }
+            children[octant_index].insert(node_id, position, NODE_MASS, remaining_depth, max_points_per_leaf);
         }
+
+        self.children = SubNodes(children.into_boxed_slice().try_into().unwrap());
     }
 
     pub fn remove(&mut self, node_id: usize, position: Vec3, max_depth: usize, max_points_per_leaf: usize) -> bool {
         if !self.bounds.contains(position) {
             return false;
         }
-        if self.is_leaf() {
-            let orig_len = self.points.len();
-            self.points.retain(|(id, _)| *id != node_id);
-            if self.points.len() < orig_len {
-                // Recompute mass and center of mass
-                self.node_count = self.points.len();
-                self.total_mass = self.node_count as f32 * NODE_MASS;
-                if self.node_count > 0 {
-                    let sum: Vec3 = self.points.iter().fold(Vec3::ZERO, |acc, (_, p)| acc + *p);
-                    self.center_of_mass = sum / self.node_count as f32;
-                } else {
-                    self.center_of_mass = Vec3::ZERO;
+
+        match &mut self.children {
+            Points(points) => {
+                let orig_len = points.len();
+                points.retain(|(id, _)| *id != node_id);
+                if points.len() < orig_len {
+                    // Recompute mass and center of mass
+                    self.node_count = points.len();
+                    self.total_mass = self.node_count as f32 * NODE_MASS;
+                    if self.node_count > 0 {
+                        let sum: Vec3 = points.iter().fold(Vec3::ZERO, |acc, (_, p)| acc + *p);
+                        self.center_of_mass = sum / self.node_count as f32;
+                    } else {
+                        self.center_of_mass = Vec3::ZERO;
+                    }
+                    return true;
                 }
-                return true;
+                false
             }
-            return false;
-        } else if let Some(ref mut children) = self.children {
-            // TODO: implement tree pruning, if children are empty or node count is too low.
-            let octant_index = self.bounds.octant_index(position);
-            let removed = children[octant_index].remove(node_id, position, max_depth - 1, max_points_per_leaf);
-            if removed {
-                self.node_count = children.iter().map(|c| c.node_count).sum::<usize>();
-                self.total_mass = children.iter().map(|c| c.total_mass).sum::<f32>();
-                if self.node_count > 0 && self.total_mass > 0.0 {
-                    let sum: Vec3 = children.iter().fold(Vec3::ZERO, |acc, c| acc + c.center_of_mass * c.total_mass);
-                    self.center_of_mass = sum / self.total_mass;
-                } else {
-                    self.center_of_mass = Vec3::ZERO;
+            SubNodes(children) => {
+                // TODO: implement tree pruning, if children are empty or node count is too low.
+                let octant_index = self.bounds.octant_index(position);
+                let removed = children[octant_index].remove(node_id, position, max_depth - 1, max_points_per_leaf);
+                if removed {
+                    self.node_count = children.iter().map(|c| c.node_count).sum::<usize>();
+                    self.total_mass = children.iter().map(|c| c.total_mass).sum::<f32>();
+                    if self.node_count > 0 && self.total_mass > 0.0 {
+                        let sum: Vec3 = children.iter().fold(Vec3::ZERO, |acc, c| acc + c.center_of_mass * c.total_mass);
+                        self.center_of_mass = sum / self.total_mass;
+                    } else {
+                        self.center_of_mass = Vec3::ZERO;
+                    }
                 }
+                removed
             }
-            return removed;
         }
-        false
     }
 
     pub fn collect_all_points(&self, out: &mut Vec<(usize, Vec3)>) {
-        if self.is_leaf() {
-            out.extend_from_slice(&self.points);
-        } else if let Some(ref children) = self.children {
-            for c in children.iter() {
-                c.collect_all_points(out);
+        match &self.children {
+            Points(points) => {
+                out.extend_from_slice(&points);
+            }
+            SubNodes(children) => {
+                for child in children.iter() {
+                    child.collect_all_points(out);
+                }
             }
         }
     }
@@ -376,8 +425,11 @@ mod tests {
         assert_eq!(octree.root.node_count, 1);
         assert_eq!(octree.root.center_of_mass, Vec3::new(5.0, 5.0, 5.0));
         assert_eq!(octree.root.total_mass, 1.0);
-        assert!(octree.root.is_leaf());
-        assert_eq!(octree.root.points.len(), 1);
+        assert!(octree.root.children.is_leaf());
+        let Points(points) = &octree.root.children else {
+            panic!("Root should be a leaf node");
+        };
+        assert_eq!(points.len(), 1);
     }
 
     #[test]
@@ -390,8 +442,8 @@ mod tests {
         octree.insert(1, Vec3::new(8.0, 8.0, 8.0), 1.0);
         
         assert_eq!(octree.root.node_count, 2);
-        assert!(!octree.root.is_leaf()); // Should have subdivided
-        assert!(octree.root.children.is_some());
+        assert!(!octree.root.children.is_leaf()); // Should have subdivided
+        assert!(octree.root.children.has_subnodes());
         
         // Center of mass should be at the midpoint
         assert!((octree.root.center_of_mass - Vec3::new(5.0, 5.0, 5.0)).length() < 0.01);
@@ -414,18 +466,18 @@ mod tests {
         octree.insert(7, Vec3::new(2.1, 2.1, 2.1), 1.0);
 
         assert_eq!(octree.root.node_count, 8);
-        assert!(!octree.root.is_leaf()); // Should have subdivided
-        assert!(octree.root.children.is_some());
+        assert!(!octree.root.children.is_leaf()); // Should have subdivided
+        assert!(octree.root.children.has_subnodes());
 
-        let child = &octree.root.children.as_ref().unwrap()[0];
+        let child = &octree.root.children.try_subnodes().unwrap()[0];
         assert_eq!(child.node_count, 8);
-        assert!(!child.is_leaf());
-        assert!(child.children.is_some());
+        assert!(!child.children.is_leaf());
+        assert!(child.children.has_subnodes());
 
-        let grandchild = &child.children.as_ref().unwrap()[0];
-        assert_eq!(grandchild.points.iter().count(), 8);
+        let grandchild = &child.children.try_subnodes().unwrap()[0];
+        assert_eq!(grandchild.children.try_points().unwrap().iter().count(), 8);
         assert_eq!(grandchild.node_count, 8);
-        assert!(grandchild.is_leaf()); // Should not subdivide further due to max depth
+        assert!(grandchild.children.is_leaf()); // Should not subdivide further due to max depth
 
         // Center of mass should be at the midpoint for all nodes
         let expected_com = Vec3::new(2.05, 2.05, 2.05);
