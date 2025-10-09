@@ -5,6 +5,7 @@ pub mod bounds;
 mod fps_ui;
 mod octree_visualization;
 mod edge_renderer;
+mod graph_compute;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -21,6 +22,7 @@ use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interac
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
+use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphComputeCache, GraphData, NodeIdToIndex};
 
 const RENDER_NODES: bool = true;
 const RENDER_EDGES: bool = true;
@@ -43,9 +45,6 @@ struct GraphEdge {
 struct NodePositions {
     positions: HashMap<usize, Vec3>,
 }
-
-#[derive(Resource)]
-struct NodeIdToIndex(HashMap<usize, usize>);
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum PhysicsMode {
@@ -151,82 +150,6 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_observer(on_slider_event)
         .add_observer(on_config_changed)
         .run();
-}
-
-// Resource to hold graph data
-#[derive(Resource)]
-struct GraphData {
-    nodes: Vec<GraphNodeData>,
-    edges: Vec<GraphEdgeData>,
-    max_on_targets: usize,
-}
-
-struct GraphNodeData {
-    id: usize,
-    on_targets: usize,
-}
-
-struct GraphEdgeData {
-    from: usize,
-    to: usize,
-}
-
-impl GraphData {
-    fn from_state_graph(graph: &StateGraph, shared: &SharedGameState) -> Self {
-        let nodes: Vec<GraphNodeData> = graph.nodes.iter()
-            .map(|(state, &id)| GraphNodeData {
-                id,
-                on_targets: shared.count_boxes_on_goals(&state.environment.boxes),
-            })
-            .collect();
-        
-        let edges: Vec<GraphEdgeData> = graph.edges.iter()
-            .map(|edge| GraphEdgeData {
-                from: edge.from,
-                to: edge.to,
-            })
-            .collect();
-        
-        let max_on_targets = nodes.iter()
-            .map(|node| node.on_targets)
-            .max()
-            .unwrap_or(1);
-        
-        Self { nodes, edges, max_on_targets }
-    }
-}
-
-// resource which holds precomputed data. must be updated accordingly whenever the graph changes.
-#[derive(Resource)]
-struct GraphComputeCache {
-    // map of node IDs to every one of their neighbors, in both directions.
-    neighbor_map: HashMap<usize, Vec<usize>>,
-    // map of node IDs to their Entity
-    entity_map: HashMap<usize, Entity>,
-}
-
-impl GraphComputeCache {
-    fn from_graph(graph: &GraphData, all_nodes: Vec<(usize, Entity)>) -> Self {
-        let mut neighbor_map: HashMap<usize, Vec<usize>> = HashMap::new();
-
-        for edge in &graph.edges {
-            neighbor_map.entry(edge.from).or_default().push(edge.to);
-            neighbor_map.entry(edge.to).or_default().push(edge.from);
-        }
-
-        for neighbors in neighbor_map.values_mut() {
-            neighbors.sort_unstable();
-            neighbors.dedup();
-            neighbors.shrink_to_fit();
-        }
-
-        let entity_map: HashMap<usize, Entity> = all_nodes.into_iter().collect();
-
-        Self {
-            neighbor_map,
-            entity_map
-        }
-    }
 }
 
 fn setup_scene(
@@ -363,7 +286,7 @@ fn setup_graph_from_data(
         edge_data.update_vertices(vertices);
         edge_data.update_edges(edges);
         commands.insert_resource(edge_data);
-        commands.insert_resource(NodeIdToIndex(id_to_index));
+        commands.insert_resource(NodeIdToIndex::new(id_to_index));
     }
     
     commands.insert_resource(NodePositions { positions: node_positions });
@@ -409,144 +332,7 @@ fn setup_octree_resource(
     commands.insert_resource(octree_resource);
 }
 
-fn setup_compute_cache(
-    node_query: Query<(&GraphNode, Entity)>,
-    mut commands: Commands,
-    graph_data: Res<GraphData>,
-) {
-    let all_nodes: Vec<(usize, Entity)> = node_query.iter()
-        .map(|(node, entity)| (node.id, entity))
-        .collect();
-    let compute_cache = GraphComputeCache::from_graph(
-        &graph_data,
-        all_nodes
-    );
-    commands.insert_resource(compute_cache);
-}
 
-fn apply_attraction_forces(
-    node: &GraphNode,
-    current_pos: Vec3,
-    compute_cache: &GraphComputeCache,
-    node_positions: &NodePositions,
-    physics: &PhysicsConfig,
-) -> Vec3 {
-    let mut attraction_force = Vec3::ZERO;
-    
-    if let Some(neighbors) = compute_cache.neighbor_map.get(&node.id) {
-        for &neighbor_id in neighbors {
-            if let Some(&neighbor_pos) = node_positions.positions.get(&neighbor_id) {
-                let diff = neighbor_pos - current_pos;
-                let distance = diff.length().max(0.1);
-                let attraction = diff.normalize() * physics.attraction_strength * distance;
-                attraction_force += attraction;
-            }
-        }
-    }
-    
-    attraction_force
-}
-
-fn integrate_physics(
-    node: &mut GraphNode,
-    transform: &mut Transform,
-    total_force: Vec3,
-    physics: &PhysicsConfig,
-    dt: f32,
-) {
-    node.velocity *= physics.damping;
-    
-    node.velocity += total_force * dt;
-    
-    if node.velocity.length() > physics.max_velocity {
-        node.velocity = node.velocity.normalize() * physics.max_velocity;
-    }
-    
-    transform.translation += node.velocity * dt;
-}
-
-fn apply_forces_and_update_octree(
-    mut node_query: Query<(&mut Transform, &mut GraphNode)>,
-    mut node_positions: ResMut<NodePositions>,
-    compute_cache: Res<GraphComputeCache>,
-    physics: Res<PhysicsConfig>,
-    user_config: Res<UserConfig>,
-    mut octree_resource: ResMut<OctreeResource>,
-    time: Res<Time>,
-) {
-    if user_config.is_simulation_disabled(&time) {
-        return;
-    }
-
-    let dt = time.delta_secs();
-    let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
-        .map(|(transform, node)| (node.id, transform.translation))
-        .collect();
-
-    let mut forces: HashMap<usize, Vec3> = HashMap::<usize, Vec3>::with_capacity(nodes_data.len());
-    match physics.physics_mode {
-        PhysicsMode::BruteForce => {
-            for (transform, node) in node_query.iter() {
-                let mut force = Vec3::ZERO;
-                let current_pos = transform.translation;
-                for &(other_id, other_pos) in nodes_data.iter() {
-                    if node.id == other_id { continue; }
-                    let diff = current_pos - other_pos;
-                    let distance = diff.length().max(0.1);
-                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                    force += repulsion;
-                }
-                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
-                forces.insert(node.id, force);
-            }
-        }
-        PhysicsMode::SpatialHash => {
-            let mut spatial_hash: SpatialHash<(usize, Vec3)> = SpatialHash::new(physics.spatial_hash_size);
-            for &(id, pos) in &nodes_data {
-                spatial_hash.insert(pos, (id, pos));
-            }
-            for (transform, node) in node_query.iter() {
-                let mut force = Vec3::ZERO;
-                let current_pos = transform.translation;
-                for &(other_id, other_pos) in spatial_hash.iter_all_nearby(current_pos) {
-                    if node.id == other_id { continue; }
-                    let diff = current_pos - other_pos;
-                    let distance = diff.length().max(0.1);
-                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                    force += repulsion;
-                }
-                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
-                forces.insert(node.id, force);
-            }
-        }
-        PhysicsMode::Octree => {
-            let octree = &octree_resource.octree;
-            for (transform, node) in node_query.iter() {
-                let mut force = Vec3::ZERO;
-                let current_pos = transform.translation;
-                force += octree.calculate_force(
-                    current_pos,
-                    physics.octree_theta,
-                    physics.repulsion_strength,
-                );
-                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
-                forces.insert(node.id, force);
-            }
-        }
-    }
-
-
-    for (mut transform, mut node) in node_query.iter_mut() {
-        if let Some(force) = forces.get(&node.id) {
-            let old_pos = transform.translation;
-            integrate_physics(&mut node, &mut transform, *force, &physics, dt);
-            let new_pos = transform.translation;
-
-            octree_resource.octree.update_resize(node.id, old_pos, new_pos, Bounds::resize_expand);
-            node_positions.positions.insert(node.id, new_pos);
-        }
-    }
-}
 
 fn update_edges(
     mut edge_query: Query<(&mut Transform, &GraphEdge)>,
@@ -578,14 +364,7 @@ fn update_shader_edge_data(
         return;
     }
 
-    let mut vertices = vec![Vec3::ZERO; node_id_to_index.0.len()];
-    for (&node_id, &index) in &node_id_to_index.0 {
-        if let Some(&position) = node_positions.positions.get(&node_id) {
-            if index < vertices.len() {
-                vertices[index] = position;
-            }
-        }
-    }
+    let vertices = node_id_to_index.get_indexed_vertex_positions(node_positions.as_ref());
     
     edge_data.update_vertices(vertices);
 }
