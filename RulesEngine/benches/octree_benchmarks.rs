@@ -37,6 +37,7 @@ fn bench_octree_creation(c: &mut Criterion) {
                         black_box(&points),
                         black_box(8),
                         black_box(10),
+                        black_box(5),
                     ))
                 });
             },
@@ -67,7 +68,7 @@ fn bench_octree_movement(c: &mut Criterion) {
                         for &(id, pos) in &initial_points {
                             node_positions.insert(id, pos);
                         }
-                        let octree = Octree::from_points(&initial_points, 8, 10);
+                        let octree = Octree::from_points(&initial_points, 8, 10, 5);
                         (octree, node_positions)
                     },
                     |(mut octree, mut node_positions)| {
@@ -127,7 +128,7 @@ fn bench_octree_force_calculation(c: &mut Criterion) {
                 b.iter_with_setup(
                     || {
                         let points = generate_random_points(node_count, BOUNDS_SIZE, &mut rng);
-                        let octree = Octree::from_points(&points, 8, 10);
+                        let octree = Octree::from_points(&points, 8, 10, 5);
                         let test_positions = generate_random_points(NUM_TEST_POSITIONS, BOUNDS_SIZE, &mut rng)
                             .into_iter()
                             .map(|(_, pos)| pos)
@@ -155,7 +156,7 @@ fn bench_octree_force_calculation(c: &mut Criterion) {
                                 (id, pos / BOUNDS_SIZE)
                             }
                         }).collect::<Vec<_>>();
-                        let mut octree = Octree::from_points(&points, 8, 10);
+                        let mut octree = Octree::from_points(&points, 8, 10, 5);
                         for (id, new_pos) in moved_points {
                             let old_pos = points[id].1;
                             octree.update(id, old_pos, new_pos);
@@ -190,7 +191,7 @@ fn bench_octree_different_theta(c: &mut Criterion) {
                 b.iter_with_setup(
                     || {
                         let points = generate_random_points(NUM_NODES, BOUNDS_SIZE, &mut rng);
-                        let octree = Octree::from_points(&points, 8, 10);
+                        let octree = Octree::from_points(&points, 8, 10, 5);
                         let test_positions = generate_random_points(NUM_TEST_POSITIONS, BOUNDS_SIZE, &mut rng)
                             .into_iter()
                             .map(|(_, pos)| pos)

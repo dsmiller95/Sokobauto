@@ -1,1 +1,1 @@
-﻿pub const DEDUPLICATE_BOXES: bool = true;
+﻿pub const DEDUPLICATE_BOXES: bool = false;

@@ -10,8 +10,15 @@ pub struct OctreeResource {
 
 pub struct Octree {
     root: OctreeNode,
+    /// absolute maximum depth of the tree. Nodes will never subdivide beyond this depth.
     max_depth: usize,
+    /// When a leaf node exceeds this number of points, it will subdivide (if max_depth allows)
     max_points_per_leaf: usize,
+    /// When a node drops below this number of points in its children, it will merge back into a leaf.
+    /// For example, when points move.
+    /// Must be less than or equal to max_points_per_leaf.
+    /// If equal to max_points_per_leaf, then adding and removing one point could cause a subdivision and merge.
+    min_points_per_node: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -67,20 +74,28 @@ pub const NODE_MASS: f32 = 1.0;
 pub const MINIMUM_DISTANCE: f32 = 0.01;
 
 impl Octree {
-    pub fn new(bounds: Bounds, max_depth: usize, max_points_per_leaf: usize) -> Self {
+    pub fn new(bounds: Bounds, max_depth: usize, max_points_per_leaf: usize, min_points_per_node: usize) -> Self {
+        if min_points_per_node > max_points_per_leaf {
+            panic!("min_points_per_node must be less than max_points_per_leaf");
+        }
         Self {
             root: OctreeNode::new(bounds),
             max_depth,
             max_points_per_leaf,
+            min_points_per_node,
         }
     }
 
-    pub fn from_points(points: &[(usize, Vec3)], max_depth: usize, max_points_per_leaf: usize) -> Self {
+    pub fn from_points(points: &[(usize, Vec3)], max_depth: usize, max_points_per_leaf: usize, min_points_per_node: usize) -> Self {
+        if min_points_per_node > max_points_per_leaf {
+            panic!("min_points_per_node must be less than max_points_per_leaf");
+        }
         if points.is_empty() {
             return Self::new(
                 Bounds::new(Vec3::splat(-1.0), Vec3::splat(1.0)),
                 max_depth,
                 max_points_per_leaf,
+                min_points_per_node,
             );
         }
 
@@ -96,7 +111,7 @@ impl Octree {
         min -= padding;
         max += padding;
 
-        let mut octree = Self::new(Bounds::new(min, max), max_depth, max_points_per_leaf);
+        let mut octree = Self::new(Bounds::new(min, max), max_depth, max_points_per_leaf, min_points_per_node);
 
         for &(node_id, position) in points {
             octree.insert(node_id, position, NODE_MASS);
@@ -127,11 +142,11 @@ impl Octree {
     }
 
     pub fn remove(&mut self, node_id: usize, position: Vec3) -> bool {
-        self.root.remove(node_id, position, self.max_depth, self.max_points_per_leaf)
+        self.root.remove(node_id, position, self.min_points_per_node)
     }
 
     pub fn update(&mut self, node_id: usize, old_pos: Vec3, new_pos: Vec3) -> bool {
-        let removed = self.root.remove(node_id, old_pos, self.max_depth, self.max_points_per_leaf);
+        let removed = self.root.remove(node_id, old_pos, self.min_points_per_node);
         if !removed {
             return false;
         }
@@ -140,7 +155,7 @@ impl Octree {
         true
     }
     pub fn update_resize(&mut self, node_id: usize, old_pos: Vec3, new_pos: Vec3, resize: impl FnOnce(&Bounds, &Vec3) -> Bounds) -> bool {
-        let removed = self.root.remove(node_id, old_pos, self.max_depth, self.max_points_per_leaf);
+        let removed = self.root.remove(node_id, old_pos, self.min_points_per_node);
         if !removed {
             return false;
         }
@@ -301,16 +316,24 @@ impl OctreeNode {
         self.children = SubNodes(children.into_boxed_slice().try_into().unwrap());
     }
 
-    pub fn remove(&mut self, node_id: usize, position: Vec3, max_depth: usize, max_points_per_leaf: usize) -> bool {
+    pub fn remove(&mut self, node_id: usize, position: Vec3, min_points_per_node: usize) -> bool {
         if !self.bounds.contains(position) {
             return false;
         }
 
-        match &mut self.children {
+        enum NodeRemoveResult {
+            NotFound,
+            Removed,
+            RemovedAndPrune,
+        }
+
+        let remove_result = match &mut self.children {
             Points(points) => {
                 let orig_len = points.len();
                 points.retain(|(id, _)| *id != node_id);
-                if points.len() < orig_len {
+                if points.len() == orig_len {
+                    NodeRemoveResult::NotFound
+                } else {
                     // Recompute mass and center of mass
                     self.node_count = points.len();
                     self.total_mass = self.node_count as f32 * NODE_MASS;
@@ -320,15 +343,17 @@ impl OctreeNode {
                     } else {
                         self.center_of_mass = Vec3::ZERO;
                     }
-                    return true;
+                    NodeRemoveResult::Removed
                 }
-                false
             }
             SubNodes(children) => {
-                // TODO: implement tree pruning, if children are empty or node count is too low.
                 let octant_index = self.bounds.octant_index(position);
-                let removed = children[octant_index].remove(node_id, position, max_depth - 1, max_points_per_leaf);
-                if removed {
+                let removed = children[octant_index].remove(node_id, position, min_points_per_node);
+                if !removed {
+                    NodeRemoveResult::NotFound
+                } else if self.node_count < min_points_per_node {
+                    NodeRemoveResult::RemovedAndPrune
+                } else {
                     self.node_count = children.iter().map(|c| c.node_count).sum::<usize>();
                     self.total_mass = children.iter().map(|c| c.total_mass).sum::<f32>();
                     if self.node_count > 0 && self.total_mass > 0.0 {
@@ -337,8 +362,19 @@ impl OctreeNode {
                     } else {
                         self.center_of_mass = Vec3::ZERO;
                     }
+                    NodeRemoveResult::Removed
                 }
-                removed
+            }
+        };
+
+        match remove_result {
+            NodeRemoveResult::NotFound => false,
+            NodeRemoveResult::Removed => true,
+            NodeRemoveResult::RemovedAndPrune => {
+                let mut new_points = Vec::new();
+                self.collect_all_points(&mut new_points);
+                self.children = Points(new_points);
+                true
             }
         }
     }
@@ -368,7 +404,7 @@ mod tests {
             (1, Vec3::new(1.0, 2.0, 3.0)),
             (2, Vec3::new(4.0, 5.0, 6.0)),
         ];
-        let mut octree = Octree::from_points(&points, 3, 1);
+        let mut octree = Octree::from_points(&points, 3, 1, 1);
 
         assert_eq!(octree.root.node_count, 2);
         assert!(octree.remove(1, Vec3::new(1.0, 2.0, 3.0)));
@@ -389,7 +425,7 @@ mod tests {
             (2, Vec3::new(5.0, 5.0, 5.0)),
         ];
 
-        let mut octree = Octree::from_points(&points, 3, 1);
+        let mut octree = Octree::from_points(&points, 3, 1, 1);
         octree.resize_bounds(octree.root.bounds.doubled());
 
         let pts = octree.get_all_points();
@@ -402,7 +438,7 @@ mod tests {
             (1, Vec3::splat(0.0)),
             (2, Vec3::splat(1.0)),
         ];
-        let mut octree = Octree::from_points(&points, 3, 1);
+        let mut octree = Octree::from_points(&points, 3, 1, 1);
 
         let updated = octree.update_resize(1, Vec3::splat(0.0), Vec3::splat(10.0), Bounds::resize_expand);
         assert!(updated);
@@ -418,7 +454,7 @@ mod tests {
     #[test]
     fn test_octree_single_point() {
         let bounds = Bounds::new(Vec3::ZERO, Vec3::splat(10.0));
-        let mut octree = Octree::new(bounds, 3, 1);
+        let mut octree = Octree::new(bounds, 3, 1, 1);
         
         octree.insert(0, Vec3::new(5.0, 5.0, 5.0), 1.0);
         
@@ -435,7 +471,7 @@ mod tests {
     #[test]
     fn test_octree_subdivision() {
         let bounds = Bounds::new(Vec3::ZERO, Vec3::splat(10.0));
-        let mut octree = Octree::new(bounds, 3, 1); // max 1 point per leaf
+        let mut octree = Octree::new(bounds, 3, 1, 1); // max 1 point per leaf
         
         // Insert two points that should cause subdivision
         octree.insert(0, Vec3::new(2.0, 2.0, 2.0), 1.0);
@@ -453,7 +489,7 @@ mod tests {
     #[test]
     fn test_octree_max_depth() {
         let bounds = Bounds::new(Vec3::ZERO, Vec3::splat(10.0));
-        let mut octree = Octree::new(bounds, 2, 1); // max 1 point per leaf
+        let mut octree = Octree::new(bounds, 2, 1, 1); // max 1 point per leaf
 
         // Insert points that will force subdivision beyond max depth
         octree.insert(0, Vec3::new(2.0, 2.0, 2.0), 1.0);
@@ -497,7 +533,7 @@ mod tests {
             (2, Vec3::new(5.0, 5.0, 5.0)),
         ];
         
-        let octree = Octree::from_points(&points, 3, 1);
+        let octree = Octree::from_points(&points, 3, 1, 1);
         
         assert_eq!(octree.root.node_count, 3);
         assert_eq!(octree.root.total_mass, 3.0);
@@ -522,7 +558,7 @@ mod tests {
     #[test]
     fn test_force_calculation_single_point() {
         let points = vec![(0, Vec3::new(0.0, 0.0, 0.0))];
-        let octree = Octree::from_points(&points, 3, 1);
+        let octree = Octree::from_points(&points, 3, 1, 1);
         
         let force = octree.calculate_force(Vec3::new(1.0, 0.0, 0.0), 0.5, 1.0);
         
@@ -538,7 +574,7 @@ mod tests {
             (0, Vec3::new(-1.0, 0.0, 0.0)),
             (1, Vec3::new(1.0, 0.0, 0.0)),
         ];
-        let octree = Octree::from_points(&points, 3, 1);
+        let octree = Octree::from_points(&points, 3, 1, 1);
         
         // Test point at origin should be repelled equally in both directions
         let force = octree.calculate_force(Vec3::ZERO, 0.5, 1.0);
@@ -552,7 +588,7 @@ mod tests {
     #[test]
     fn test_center_of_mass_calculation() {
         let bounds = Bounds::new(Vec3::ZERO, Vec3::splat(10.0));
-        let mut octree = Octree::new(bounds, 3, 10); // High threshold to keep as leaf
+        let mut octree = Octree::new(bounds, 3, 10, 1); // High threshold to keep as leaf
         
         // Insert points with different masses
         octree.insert(0, Vec3::new(0.0, 0.0, 0.0), 1.0);
@@ -570,7 +606,7 @@ mod tests {
     #[test]
     fn test_empty_octree() {
         let points = vec![];
-        let octree = Octree::from_points(&points, 3, 1);
+        let octree = Octree::from_points(&points, 3, 1, 1);
         
         assert_eq!(octree.root.node_count, 0);
         assert_eq!(octree.root.total_mass, 0.0);
@@ -587,7 +623,7 @@ mod tests {
             points.push((i, Vec3::new(100.0 + i as f32 * 0.1, 100.0, 100.0)));
         }
         
-        let octree = Octree::from_points(&points, 5, 2);
+        let octree = Octree::from_points(&points, 5, 2, 1);
         
         // Calculate force with different theta values
         let test_pos = Vec3::ZERO;
@@ -613,7 +649,7 @@ mod tests {
             (2, Vec3::new(5.0, 5.0, 5.0)),
         ];
         
-        let octree = Octree::from_points(&points, 3, 1);
+        let octree = Octree::from_points(&points, 3, 1, 1);
         let viz_data = octree.get_visualization_data();
         
         // Should have at least the root node

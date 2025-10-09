@@ -69,6 +69,7 @@ struct PhysicsConfig {
     octree_theta: f32,
     octree_max_depth: usize,
     octree_max_points_per_leaf: usize,
+    octree_min_points_per_node: usize,
 }
 
 #[derive(Resource)]
@@ -135,6 +136,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             octree_theta: 0.8, // Good balance between accuracy and performance
             octree_max_depth: 8, // Should handle 50k nodes well
             octree_max_points_per_leaf: 16, // Reasonable leaf size
+            octree_min_points_per_node: 8, // Prevent excessive subdivision
         })
         .add_systems(Startup, (setup_scene, setup_graph_from_data, setup_octree_resource, setup_compute_cache, setup_fps_counter, setup_octree_visualization, setup_config_panel).chain())
         .add_systems(Update, (apply_forces_and_update_octree, update_edges, update_fps_counter, update_octree_visualization, handle_toggle_interactions));
@@ -401,6 +403,7 @@ fn setup_octree_resource(
             &points,
             physics.octree_max_depth,
             physics.octree_max_points_per_leaf,
+            physics.octree_min_points_per_node,
         )
     };
     commands.insert_resource(octree_resource);
