@@ -16,6 +16,7 @@ use rand::Rng;
 use std::collections::{HashMap};
 use std::hint::black_box;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin};
+use bevy::input::keyboard::{Key};
 use bevy::pbr::wireframe::{WireframePlugin};
 use crate::bevy_interface::octree::{Octree, OctreeResource};
 use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interactions, on_toggle_event, on_slider_event, ConfigChangedEvent, ConfigType, SliderType};
@@ -23,6 +24,7 @@ use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphData, NodeIdToIndex};
+use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
 
 const RENDER_NODES: bool = black_box(true);
 
@@ -113,7 +115,9 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .insert_resource(graph_data)
         .insert_resource(OctreeVisualizationConfig::default());
 
-    app.add_plugins(EdgeRenderPlugin);
+    app
+        .add_plugins(EdgeRenderPlugin)
+        .add_plugins(NodeSelectionPlugin);
 
     app.insert_resource(PhysicsConfig {
             repulsion_strength: 50.0,
@@ -129,7 +133,11 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             octree_min_points_per_node: 8, // Prevent excessive subdivision
         })
         .add_systems(Startup, (setup_scene, setup_shared_meshes, setup_graph_from_data, setup_octree_resource, setup_compute_cache, setup_fps_counter, setup_octree_visualization, setup_config_panel).chain())
-        .add_systems(Update, (apply_forces_and_update_octree, update_fps_counter, update_octree_visualization, handle_toggle_interactions));
+        .add_systems(Update, (
+            apply_forces_and_update_octree, update_octree_visualization,
+            update_fps_counter,
+            handle_toggle_interactions, select_random_node_when_space_bar_pressed
+        ));
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
         .add_systems(Update, update_shader_edge_data);
@@ -296,6 +304,27 @@ fn update_shader_edge_data(
     let vertices = node_id_to_index.get_indexed_vertex_positions(node_positions.as_ref());
     
     edge_data.update_vertices(vertices);
+}
+
+fn select_random_node_when_space_bar_pressed(
+    mut commands: Commands,
+    node_materials: Query<Entity, (With<GraphNode>, Without<SelectedNode>)>,
+    selected_nodes: Query<Entity, With<SelectedNode>>,
+    button_input: Res<ButtonInput<Key>>
+){
+    if !button_input.pressed(Key::Space) {
+        return;
+    }
+
+    use rand::seq::IteratorRandom;
+    let mut rng = rand::rng();
+
+    for selected_entity in selected_nodes.iter() {
+        commands.entity(selected_entity).remove::<SelectedNode>();
+    }
+
+    let picked_entity = node_materials.iter().choose(&mut rng).unwrap();
+    commands.entity(picked_entity).insert(SelectedNode);
 }
 
 fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {

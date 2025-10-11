@@ -15,7 +15,7 @@ use crate::console_interface::{
 };
 use crate::core::{step, GameState, GameUpdate, SharedGameState};
 use crate::models::GameRenderState;
-use crate::state_graph::{get_graph_info, get_json_data, populate_step, render_graph, render_interactive_graph, trim_unwinnable, GraphRenderState, PopulateResult, StateGraph, UniqueNode};
+use crate::state_graph::{get_graph_info, get_json_data, populate_step, render_graph, trim_unwinnable, GraphRenderState, PopulateResult, StateGraph, UniqueNode};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use std::io;
@@ -24,23 +24,23 @@ use std::io::Write;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let switch = std::env::args().nth(1).unwrap_or("interactive".to_string());
 
-    let level = r#"
-       ####
-########  ##
-#          ###
-# @$$ ##   ..#
-# $$   ##  ..#
-#         ####
-###########
-"#;
-    //     let level = r#"
-    // ########
-    // # @$  .#
-    // # $  $ #
-    // # .# $ #
-    // #..#   #
-    // ########
-    // "#;
+//     let level = r#"
+//        ####
+// ########  ##
+// #          ###
+// # @$$ ##   ..#
+// # $$   ##  ..#
+// #         ####
+// ###########
+// "#;
+        let level = r#"
+    ########
+    # @$  .#
+    # $  $ #
+    # .# $ #
+    #..#   #
+    ########
+    "#;
 
     let (game_state, shared) = parse_level(level);
     let mut terminal = setup_terminal()?;
