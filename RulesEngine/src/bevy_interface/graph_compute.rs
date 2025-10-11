@@ -28,6 +28,15 @@ pub struct GraphEdgeData {
     pub to: usize,
 }
 
+// resource which holds precomputed data. must be updated accordingly whenever the graph changes.
+#[derive(Resource)]
+pub struct GraphComputeCache {
+    // map of node IDs to every one of their neighbors, in both directions.
+    neighbor_map: HashMap<usize, Vec<usize>>,
+    // map of node IDs to their Entity
+    entity_map: HashMap<usize, Entity>,
+}
+
 impl GraphData {
     pub fn from_state_graph(graph: &StateGraph, shared: &SharedGameState) -> Self {
         let nodes: Vec<GraphNodeData> = graph.nodes.iter()
@@ -51,15 +60,6 @@ impl GraphData {
 
         Self { nodes, edges, max_on_targets }
     }
-}
-
-// resource which holds precomputed data. must be updated accordingly whenever the graph changes.
-#[derive(Resource)]
-pub struct GraphComputeCache {
-    // map of node IDs to every one of their neighbors, in both directions.
-    neighbor_map: HashMap<usize, Vec<usize>>,
-    // map of node IDs to their Entity
-    entity_map: HashMap<usize, Entity>,
 }
 
 impl GraphComputeCache {

@@ -308,8 +308,9 @@ fn update_shader_edge_data(
 
 fn select_random_node_when_space_bar_pressed(
     mut commands: Commands,
-    node_materials: Query<Entity, (With<GraphNode>, Without<SelectedNode>)>,
-    selected_nodes: Query<Entity, With<SelectedNode>>,
+    unselected_nodes: Query<(Entity, &GraphNode), Without<SelectedNode>>,
+    selected_nodes: Query<(Entity, &GraphNode), With<SelectedNode>>,
+    graph_data: Res<GraphData>,
     button_input: Res<ButtonInput<Key>>
 ){
     if !button_input.pressed(Key::Space) {
@@ -319,12 +320,37 @@ fn select_random_node_when_space_bar_pressed(
     use rand::seq::IteratorRandom;
     let mut rng = rand::rng();
 
-    for selected_entity in selected_nodes.iter() {
-        commands.entity(selected_entity).remove::<SelectedNode>();
+    let last_selected_nodes = selected_nodes.iter().map(|(_, node)| node.id).collect::<Vec<_>>();
+
+    let mut picked_entity = None;
+    if last_selected_nodes.len() > 0 {
+        let possible_next_nodes = graph_data.edges.iter()
+            .filter(|edge| last_selected_nodes.contains(&edge.from))
+            .map(|edge| edge.to)
+            .collect::<Vec<_>>();
+        if possible_next_nodes.len() > 0 {
+            picked_entity = unselected_nodes.iter()
+                .filter(|(_, node)| possible_next_nodes.contains(&node.id))
+                .map(|(entity, _)| entity)
+                .choose(&mut rng)
+        }
     }
 
-    let picked_entity = node_materials.iter().choose(&mut rng).unwrap();
-    commands.entity(picked_entity).insert(SelectedNode);
+    let picked_entity = match picked_entity {
+        Some(picked_entity) => Some(picked_entity),
+        None => {
+            // if there are no other ways to move through the graph, then, clear the entire selection and pick a new random node
+            for (selected_entity, _) in selected_nodes.iter() {
+                commands.entity(selected_entity).remove::<SelectedNode>();
+            }
+
+            unselected_nodes.iter().choose(&mut rng).map(|x| x.0)
+        }
+    };
+
+    if let Some(picked_entity) = picked_entity {
+        commands.entity(picked_entity).insert(SelectedNode);
+    }
 }
 
 fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {
