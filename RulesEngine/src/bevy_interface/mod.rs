@@ -158,7 +158,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             handle_toggle_interactions,
             start_playing_random_node_when_space_pressed, // select_random_adjacent_node_when_space_bar_pressed,
             select_nodes_with_playing_games,
-            visualize_newly_selected_node_game
+            visualize_playing_games
         ));
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
@@ -340,12 +340,12 @@ fn update_shader_edge_data(
     edge_data.update_vertices(vertices);
 }
 
-fn visualize_newly_selected_node_game(
-    selected_nodes: Query<(&GraphNode), Added<SelectedNode>>,
+fn visualize_playing_games(
+    selected_nodes: Query<(&GraphNode, &PlayingGameState), Changed<PlayingGameState>>,
     source_graph_data: Res<SourceGraphData>,
     mut tiles: ResMut<Tiles>,
 ){
-    let Ok(selected_node) = selected_nodes.single() else {
+    let Ok((selected_node, playing_state)) = selected_nodes.single() else {
         return;
     };
 
@@ -354,14 +354,16 @@ fn visualize_newly_selected_node_game(
         return;
     };
 
+    let game_state = playing_state.apply_to_node(selected_game_state.clone());
+
     let grid_size = IVec2::new(source_graph_data.shared.width(), source_graph_data.shared.height());
     let mut new_grid = vec![vec![TileType::Empty; grid_size.x as usize]; grid_size.y as usize];
     for x in 0..grid_size.x {
         for y in 0..grid_size.y {
             let cell = source_graph_data.shared.grid[y as usize][x as usize];
             let vec = IVec2 { x, y };
-            let is_player = selected_game_state.minimum_reachable_player_position == vec;
-            let is_box = selected_game_state.environment.boxes.contains(&vec.into());
+            let is_player = game_state.player == vec.into();
+            let is_box = game_state.environment.boxes.contains(&vec.into());
             let tile = match cell {
                 Cell::Wall => TileType::Wall,
                 Cell::Floor =>
