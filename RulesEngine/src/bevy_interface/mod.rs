@@ -27,6 +27,7 @@ use crate::bevy_interface::octree_visualization::{setup_octree_visualization, up
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
+use crate::bevy_interface::selected_game_navigation::SelectedGameNavigationPlugin;
 use crate::bevy_interface::tile_render::{TileRenderPlugin, TileType, Tiles};
 
 const RENDER_NODES: bool = black_box(true);
@@ -131,7 +132,11 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .insert_resource(OctreeVisualizationConfig::default());
 
     app
-        .add_plugins((EdgeRenderPlugin, NodeSelectionPlugin, TileRenderPlugin));
+        .add_plugins((
+            EdgeRenderPlugin,
+            NodeSelectionPlugin,
+            TileRenderPlugin,
+            SelectedGameNavigationPlugin));
 
     app.insert_resource(PhysicsConfig {
             repulsion_strength: 50.0,
