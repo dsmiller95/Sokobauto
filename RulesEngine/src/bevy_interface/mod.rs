@@ -158,7 +158,8 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             handle_toggle_interactions,
             start_playing_random_node_when_space_pressed, // select_random_adjacent_node_when_space_bar_pressed,
             select_nodes_with_playing_games,
-            visualize_playing_games
+            visualize_playing_games,
+            focus_newly_selected_node,
         ));
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
@@ -345,7 +346,7 @@ fn visualize_playing_games(
     source_graph_data: Res<SourceGraphData>,
     mut tiles: ResMut<Tiles>,
 ){
-    let Ok((selected_node, playing_state)) = selected_nodes.single() else {
+    let Some((selected_node, playing_state)) = selected_nodes.iter().next() else {
         return;
     };
 
@@ -381,6 +382,21 @@ fn visualize_playing_games(
     }
 
     tiles.assign_new_grid(new_grid)
+}
+
+fn focus_newly_selected_node(
+    selected_nodes: Query<&Transform, Added<SelectedNode>>,
+    mut orbit_cameras: Query<&mut PanOrbitCamera>,
+){
+    let Ok(selected_transform) = selected_nodes.single() else {
+        return;
+    };
+
+    let new_focus = selected_transform.translation;
+
+    for mut orbit_camera in orbit_cameras.iter_mut() {
+        orbit_camera.target_focus = new_focus;
+    }
 }
 
 fn select_nodes_with_playing_games(

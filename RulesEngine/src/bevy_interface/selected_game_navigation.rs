@@ -89,7 +89,7 @@ fn process_game_input(
 
         match update {
             GameUpdate::Error(_) => {
-                commands.entity(entity).remove::<PlayingGameState>();
+                // noop, game did not change
             }
             GameUpdate::NextState(game_state, GameChangeType::PlayerMove) => {
                 playing_game_state.player_pos = game_state.player.into();

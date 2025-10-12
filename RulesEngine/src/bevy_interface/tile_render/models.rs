@@ -83,7 +83,8 @@ impl Tiles {
         }
         Tiles {
             grid,
-            root: Vec3::splat(0.0),
+            // TODO: configure root from the top level module
+            root: Vec3::new(200.0, 200.0, 0.0),
             cell_size: assets.tile_size,
             grid_size,
             rendered_grid_size: grid_size,
