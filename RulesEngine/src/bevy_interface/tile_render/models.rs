@@ -1,0 +1,162 @@
+﻿use std::collections::HashMap;
+use bevy::prelude::*;
+use rand::Rng;
+
+#[derive(Resource)]
+pub struct Tiles {
+    grid: Vec<Vec<TileType>>,
+    root: Vec3,
+    cell_size: Vec2,
+    grid_size: IVec2,
+    rendered_grid_size: IVec2,
+    tile_contents_dirty: bool,
+}
+
+#[derive(Resource)]
+pub struct TileAssets {
+    images: HashMap<TileType, Handle<Image>>,
+    tile_size: Vec2,
+}
+
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+pub enum TileType {
+    Empty,
+    Floor,
+    Wall,
+    Box,
+    Target
+}
+
+#[derive(Component)]
+pub struct TileSlot {
+    pub location: IVec2,
+    pub tile_type: TileType,
+}
+
+const ALL_TILE_TYPES: &[TileType] = &[
+    TileType::Empty,
+    TileType::Floor,
+    TileType::Wall,
+    TileType::Box,
+    TileType::Target,
+];
+
+impl TileType {
+    pub fn all() -> &'static [TileType] {
+        ALL_TILE_TYPES
+    }
+
+    pub fn file_name(&self) -> &'static str {
+        match self {
+            TileType::Empty => "sprites/tiles/empty.png",
+            TileType::Floor => "sprites/tiles/floor.png",
+            TileType::Wall => "sprites/tiles/wall.png",
+            TileType::Box => "sprites/tiles/box.png",
+            TileType::Target => "sprites/tiles/target.png"
+        }
+    }
+}
+
+impl Tiles {
+    pub fn new_empty() -> Tiles {
+        Tiles {
+            grid: vec![],
+            root: Vec3::splat(0.0),
+            cell_size: Vec2::ZERO,
+            grid_size: IVec2::splat(0),
+            rendered_grid_size: IVec2::splat(0),
+            tile_contents_dirty: false,
+        }
+    }
+
+    pub fn new_random(assets: &TileAssets) -> Tiles {
+        let grid_size = IVec2::new(10, 10);
+        let mut rng = rand::rng();
+        let mut grid = vec![vec![TileType::Empty; grid_size.x as usize]; grid_size.y as usize];
+        for x in 0..grid_size.x as usize {
+            for y in 0..grid_size.y as usize {
+                grid[y][x] = rng.random();
+            }
+        }
+        Tiles {
+            grid,
+            root: Vec3::splat(0.0),
+            cell_size: assets.tile_size,
+            grid_size,
+            rendered_grid_size: grid_size,
+            tile_contents_dirty: false,
+        }
+    }
+
+    pub fn get_grid_size(&self) -> IVec2 {
+        self.grid_size
+    }
+
+    /// If the grid size does not match the rendered size, this returns the new size. Otherwise None
+    pub fn get_new_rendered_size(&self) -> Option<IVec2> {
+        if self.grid_size == self.rendered_grid_size {
+            None
+        }else {
+            Some(self.grid_size)
+        }
+    }
+
+    /// Mark that the grid rendered to the given new size.
+    pub fn mark_grid_rendered_to_size(&mut self, new_size: IVec2) {
+        if self.grid_size != new_size {
+            eprintln!("Warning: grid size rendered to {:?}, does not match current grid size {:?}", new_size, self.grid_size);
+        }
+        self.rendered_grid_size = new_size;
+    }
+
+    pub fn get_tile_at(&self, location: IVec2) -> TileType {
+        self.grid
+            .get(location.y as usize)
+            .and_then(|v| v.get(location.x as usize))
+            .copied()
+            .unwrap_or(TileType::Empty)
+    }
+
+    pub fn get_tile_world_position(&self, location: IVec2) -> Vec3 {
+        (location.as_vec2() * self.cell_size).extend(0.0) + self.root
+    }
+
+    pub fn tiles_dirty(&self) -> bool {
+        self.tile_contents_dirty
+    }
+
+    pub fn mark_tiles_not_dirty(&mut self) {
+        self.tile_contents_dirty = false
+    }
+}
+
+impl TileAssets {
+    pub fn new_load(asset_server: Res<AssetServer>) -> TileAssets {
+        let mut images: HashMap<TileType, Handle<Image>> = HashMap::new();
+        for &tile in TileType::all() {
+            let image_asset = asset_server.load(tile.file_name());
+
+            images.insert(tile, image_asset);
+        }
+
+        TileAssets::new(images)
+    }
+
+    pub fn new(images: HashMap<TileType, Handle<Image>>) -> TileAssets {
+        TileType::all().into_iter().for_each(|t| {
+            images.get(&t).expect("No image loaded");
+        });
+
+        TileAssets {
+            images,
+            tile_size: Vec2::splat(32.),
+        }
+    }
+
+    pub fn get_sprite_for_tile(&self, tile_type: TileType) -> Sprite {
+        match self.images.get(&tile_type) {
+            Some(image) => Sprite::from_image(image.clone()),
+            None => Sprite::from_color(bevy::color::palettes::basic::MAROON, Vec2::splat(1.0)),
+        }
+    }
+}

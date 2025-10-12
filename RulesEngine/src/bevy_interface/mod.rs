@@ -7,6 +7,7 @@ mod octree_visualization;
 mod edge_renderer;
 mod graph_compute;
 mod node_selection;
+mod tile_render;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -25,6 +26,7 @@ use crate::bevy_interface::octree_visualization::{setup_octree_visualization, up
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
+use crate::bevy_interface::tile_render::TileRenderPlugin;
 
 const RENDER_NODES: bool = black_box(true);
 
@@ -116,8 +118,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .insert_resource(OctreeVisualizationConfig::default());
 
     app
-        .add_plugins(EdgeRenderPlugin)
-        .add_plugins(NodeSelectionPlugin);
+        .add_plugins((EdgeRenderPlugin, NodeSelectionPlugin, TileRenderPlugin));
 
     app.insert_resource(PhysicsConfig {
             repulsion_strength: 50.0,
@@ -156,6 +157,18 @@ fn setup_scene(
         Camera3d::default(),
         Transform::from_xyz(20.0, 20.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
         PanOrbitCamera::default(),
+        Camera {
+            order: 0,
+            ..default()
+        }
+    ));
+    commands.spawn((
+        Camera2d::default(),
+        Transform::default(),
+        Camera {
+            order: 1,
+            ..default()
+        }
     ));
 }
 
