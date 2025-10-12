@@ -24,7 +24,8 @@ pub enum TileType {
     Floor,
     Wall,
     Box,
-    Target
+    Target,
+    Player,
 }
 
 #[derive(Component)]
@@ -39,6 +40,7 @@ const ALL_TILE_TYPES: &[TileType] = &[
     TileType::Wall,
     TileType::Box,
     TileType::Target,
+    TileType::Player,
 ];
 
 impl TileType {
@@ -52,7 +54,8 @@ impl TileType {
             TileType::Floor => "sprites/tiles/floor.png",
             TileType::Wall => "sprites/tiles/wall.png",
             TileType::Box => "sprites/tiles/box.png",
-            TileType::Target => "sprites/tiles/target.png"
+            TileType::Target => "sprites/tiles/target.png",
+            TileType::Player => "sprites/tiles/player.png"
         }
     }
 }
@@ -86,6 +89,14 @@ impl Tiles {
             rendered_grid_size: grid_size,
             tile_contents_dirty: false,
         }
+    }
+
+    pub fn assign_new_grid(&mut self, new_grid: Vec<Vec<TileType>>) {
+        self.grid = new_grid;
+        self.tile_contents_dirty = true;
+        let y = self.grid.len();
+        let x = if y > 0 { self.grid[0].len() } else { 0 };
+        self.grid_size = IVec2::new(x as i32, y as i32);
     }
 
     pub fn get_grid_size(&self) -> IVec2 {

@@ -1,6 +1,7 @@
 use crate::core::{GameStateEnvironment, Vec2};
 use std::collections::{HashSet};
 
+#[derive(Clone)]
 pub struct StateGraph {
     // map from game state to node id
     pub nodes: bimap::BiMap<UniqueNode, usize>,

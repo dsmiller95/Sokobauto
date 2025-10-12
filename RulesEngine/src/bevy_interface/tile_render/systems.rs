@@ -1,5 +1,5 @@
 ﻿use bevy::prelude::*;
-use crate::bevy_interface::tile_render::models::{TileAssets, TileSlot, TileType, Tiles};
+use crate::bevy_interface::tile_render::models::{TileAssets, TileSlot, Tiles};
 
 pub fn setup_tile_render(mut commands: Commands, asset_server: Res<AssetServer>){
     let tile_assets = TileAssets::new_load(asset_server);
@@ -23,6 +23,8 @@ pub fn update_grid_size(
         Some(size) => size,
         None => if tiles.is_added() { tiles.get_grid_size() } else { return; },
     };
+
+    println!("New grid size: {:?}", new_size);
 
     // despawn
     for entity in existing_tiles.iter() {
@@ -50,17 +52,19 @@ pub fn update_grid_size(
 }
 
 pub fn update_grid(
-    mut existing_tiles: Query<(&TileSlot, &mut Sprite)>,
+    mut existing_tiles: Query<(&mut TileSlot, &mut Sprite)>,
     mut tiles: ResMut<Tiles>,
     tile_assets: Res<TileAssets>) {
 
-    if !tiles.is_changed() || !tiles.tiles_dirty() {
+    if !tiles.tiles_dirty() {
         return;
     }
 
-    for (tile_slot, mut sprite) in existing_tiles.iter_mut() {
+    for (mut tile_slot, mut sprite) in existing_tiles.iter_mut() {
         let tile_type = tiles.get_tile_at(tile_slot.location);
+
         if tile_type == tile_slot.tile_type { continue; }
+        tile_slot.tile_type = tile_type;
 
         *sprite = tile_assets.get_sprite_for_tile(tile_type);
     }

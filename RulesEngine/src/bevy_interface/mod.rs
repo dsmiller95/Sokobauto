@@ -12,7 +12,7 @@ mod tile_render;
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use crate::state_graph::StateGraph;
-use crate::core::SharedGameState;
+use crate::core::{Cell, SharedGameState};
 use rand::Rng;
 use std::collections::{HashMap};
 use std::hint::black_box;
@@ -26,7 +26,7 @@ use crate::bevy_interface::octree_visualization::{setup_octree_visualization, up
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
-use crate::bevy_interface::tile_render::TileRenderPlugin;
+use crate::bevy_interface::tile_render::{TileRenderPlugin, TileType, Tiles};
 
 const RENDER_NODES: bool = black_box(true);
 
@@ -40,6 +40,12 @@ struct GraphNode {
 #[derive(Resource)]
 struct NodePositions {
     positions: HashMap<usize, Vec3>,
+}
+
+#[derive(Resource)]
+struct SourceGraphData {
+    graph: StateGraph,
+    shared: SharedGameState,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -94,6 +100,11 @@ impl UserConfig {
 }
 
 pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
+    let source_data = SourceGraphData {
+        graph: graph.clone(),
+        shared: shared.clone(),
+    };
+
     let graph_data = GraphData::from_state_graph(graph, shared);
     let user_config = UserConfig {
         force_simulation_enabled: false,
@@ -113,6 +124,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(WireframePlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .insert_resource(source_data)
         .insert_resource(user_config)
         .insert_resource(graph_data)
         .insert_resource(OctreeVisualizationConfig::default());
@@ -137,7 +149,8 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_systems(Update, (
             apply_forces_and_update_octree, update_octree_visualization,
             update_fps_counter,
-            handle_toggle_interactions, select_random_node_when_space_bar_pressed
+            handle_toggle_interactions, select_random_node_when_space_bar_pressed,
+            visualize_newly_selected_node_game
         ));
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
@@ -319,6 +332,50 @@ fn update_shader_edge_data(
     edge_data.update_vertices(vertices);
 }
 
+fn visualize_newly_selected_node_game(
+    selected_nodes: Query<(&GraphNode), Added<SelectedNode>>,
+    source_graph_data: Res<SourceGraphData>,
+    mut tiles: ResMut<Tiles>,
+){
+    let Ok(selected_node) = selected_nodes.single() else {
+        return;
+    };
+
+    let Some(selected_game_state) = source_graph_data.graph.nodes.get_by_right(&selected_node.id) else {
+        eprintln!("Node not found {}", selected_node.id);
+        return;
+    };
+
+    let grid_size = IVec2::new(source_graph_data.shared.width(), source_graph_data.shared.height());
+    let mut new_grid = vec![vec![TileType::Empty; grid_size.x as usize]; grid_size.y as usize];
+    for x in 0..grid_size.x {
+        for y in 0..grid_size.y {
+            let cell = source_graph_data.shared.grid[y as usize][x as usize];
+            let vec = crate::core::Vec2 {
+                i: y,
+                j: x,
+            };
+            let is_player = selected_game_state.minimum_reachable_player_position == vec;
+            let is_box = selected_game_state.environment.boxes.contains(&vec);
+            let tile = match cell {
+                Cell::Wall => TileType::Wall,
+                Cell::Floor =>
+                    if is_player { TileType::Player }
+                    else if is_box { TileType::Box }
+                    else { TileType::Floor } ,
+                Cell::Target =>
+                    if is_player { TileType::Player }
+                    else if is_box { TileType::Box }
+                    else { TileType::Target },
+            };
+
+            new_grid[(grid_size.y - y - 1) as usize][x as usize] = tile;
+        }
+    }
+
+    tiles.assign_new_grid(new_grid)
+}
+
 fn select_random_node_when_space_bar_pressed(
     mut commands: Commands,
     unselected_nodes: Query<(Entity, &GraphNode), Without<SelectedNode>>,
@@ -326,7 +383,7 @@ fn select_random_node_when_space_bar_pressed(
     graph_data: Res<GraphData>,
     button_input: Res<ButtonInput<Key>>
 ){
-    if !button_input.pressed(Key::Space) {
+    if !button_input.just_pressed(Key::Space) {
         return;
     }
 

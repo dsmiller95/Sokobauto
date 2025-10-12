@@ -5,6 +5,7 @@ pub enum Cell {
     Target,
 }
 
+// TODO: use glam::i32::ivec2 instead 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[derive(PartialOrd, Ord)]
 pub struct Vec2 {
@@ -25,6 +26,7 @@ pub enum UserAction {
     Move(Direction),
 }
 
+#[derive(Clone)]
 pub struct SharedGameState {
     pub grid: Vec<Vec<Cell>>,
 }
