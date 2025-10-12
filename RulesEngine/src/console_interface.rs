@@ -1,9 +1,9 @@
 use std::hint::black_box;
-use crate::core::{Direction, GameState, GameStateEnvironment, SharedGameState, UserAction, DEDUPLICATE_BOXES};
+use crate::core::{Direction, GameState, GameStateEnvironment, SharedGameState, UserAction, Vec2GameLogicAdapter, DEDUPLICATE_BOXES};
 use crate::models::Cell::{
     Floor, Target, Wall,
 };
-use crate::models::{Cell, GameRenderState, Vec2};
+use crate::models::{Cell, GameRenderState};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     Terminal,
@@ -13,14 +13,15 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 use std::io;
+use bevy::math::IVec2;
 
 pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
     let mut grid: Vec<Vec<Cell>> = Vec::new();
-    let mut player = Vec2 { i: 0, j: 0 };
-    let mut boxes: Vec<Vec2> = Vec::new();
+    let mut player = IVec2 { x: 0, y: 0 };
+    let mut boxes: Vec<IVec2> = Vec::new();
     let max_width = s.lines().map(|line| line.len()).max().unwrap_or(0);
 
-    let mut i = 0;
+    let mut y = 0;
     for line in s.lines() {
         let line = line.trim_matches('\n');
         if line.len() == 0 {
@@ -28,37 +29,26 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
         }
 
         let mut row = Vec::new();
-        for (j, ch) in line.chars().enumerate() {
+        for (x, ch) in line.chars().enumerate() {
+            let pos = IVec2 { y, x: x as i32, };
             let c = match ch {
                 '#' => Wall,
                 ' ' => Floor,
                 '.' => Target,
                 '$' => {
-                    boxes.push(Vec2 {
-                        i: i as i32,
-                        j: j as i32,
-                    });
+                    boxes.push(pos);
                     Floor
                 },
                 '*' => {
-                    boxes.push(Vec2 {
-                        i: i as i32,
-                        j: j as i32,
-                    });
+                    boxes.push(pos);
                     Target
                 },
                 '@' => {
-                    player = Vec2 {
-                        i: i as i32,
-                        j: j as i32,
-                    };
+                    player = pos;
                     Floor
                 }
                 '+' => {
-                    player = Vec2 {
-                        i: i as i32,
-                        j: j as i32,
-                    };
+                    player = pos;
                     Target
                 }
                 _ => Floor,
@@ -70,19 +60,17 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
             row.push(Floor);
         }
         grid.push(row);
-        i += 1;
+        y += 1;
     }
-
 
     if black_box(DEDUPLICATE_BOXES) {
-        boxes.sort()
+        boxes.sort_by(Vec2GameLogicAdapter::cmp);
     }
+
     (
         GameState {
-            player,
-            environment: GameStateEnvironment {
-                boxes
-            },
+            player: player.into(),
+            environment: GameStateEnvironment::new(boxes),
         },
         SharedGameState {
             grid,
@@ -154,14 +142,14 @@ pub fn render_game(
 
 pub fn render_game_to_string(shared: &SharedGameState, game: &GameState) -> String {
     let mut result = String::new();
-    for (i, row) in shared.grid.iter().enumerate() {
-        for (j, c) in row.iter().enumerate() {
-            let pos = Vec2 {
-                i: i as i32,
-                j: j as i32,
+    for (y, row) in shared.grid.iter().enumerate() {
+        for (x, c) in row.iter().enumerate() {
+            let pos = IVec2 {
+                y: y as i32,
+                x: x as i32,
             };
-            let has_player = pos == game.player;
-            let has_box = game.environment.boxes.contains(&pos);
+            let has_player = pos == game.player.into();
+            let has_box = game.environment.boxes.contains(&pos.into());
             let ch = match c {
                 Wall => '#',
                 Floor => if has_player { '@' } else { if has_box { '$' } else { ' ' } },

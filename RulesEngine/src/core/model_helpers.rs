@@ -1,9 +1,9 @@
-use std::ops::Deref;
+use std::cmp::Ordering;
 use bevy::math::IVec2;
 use crate::core::{Cell, Direction, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
 use crate::core::bounded_grid::BoundedGrid;
 use crate::core::bounds::BoundsOriginRoot;
-use crate::models::Vec2;
+use crate::core::models::Vec2;
 
 pub struct WonCheckHelper {
     target_positions_sorted: Vec<Vec2>,
@@ -199,6 +199,8 @@ impl From<Vec2> for IVec2 {
 
 pub trait Vec2GameLogicAdapter {
     fn neighbors(&self) -> [Self; 4] where Self: Sized;
+
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering;
 }
 
 impl Vec2GameLogicAdapter for Vec2 {
@@ -210,6 +212,10 @@ impl Vec2GameLogicAdapter for Vec2 {
             Vec2 { i: self.i, j: self.j + 1 },
         ]
     }
+
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(self, other)
+    }
 }
 
 impl Vec2GameLogicAdapter for IVec2 {
@@ -220,6 +226,15 @@ impl Vec2GameLogicAdapter for IVec2 {
             IVec2 { y: self.y, x: self.x - 1 },
             IVec2 { y: self.y, x: self.x + 1 },
         ]
+    }
+
+    fn cmp(&self, other: &Self) -> Ordering {
+        let x = self.x.cmp(&other.x);
+        let y = self.y.cmp(&other.y);
+        match (x, y) {
+            (Ordering::Equal, second) => second,
+            (first, _) => first,
+        }
     }
 }
 
@@ -260,5 +275,13 @@ impl GameChangeType {
 impl Cell {
     pub fn is_walkable(&self) -> bool {
         *self != Cell::Wall
+    }
+}
+
+impl GameStateEnvironment {
+    pub fn new(boxes: Vec<IVec2>) -> GameStateEnvironment {
+        GameStateEnvironment {
+            boxes: boxes.into_iter().map(|x| x.into()).collect(),
+        }
     }
 }

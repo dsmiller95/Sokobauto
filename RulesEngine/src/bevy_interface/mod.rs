@@ -8,6 +8,7 @@ mod edge_renderer;
 mod graph_compute;
 mod node_selection;
 mod tile_render;
+mod selected_game_navigation;
 
 use bevy::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -351,12 +352,9 @@ fn visualize_newly_selected_node_game(
     for x in 0..grid_size.x {
         for y in 0..grid_size.y {
             let cell = source_graph_data.shared.grid[y as usize][x as usize];
-            let vec = crate::core::Vec2 {
-                i: y,
-                j: x,
-            };
+            let vec = IVec2 { x, y };
             let is_player = selected_game_state.minimum_reachable_player_position == vec;
-            let is_box = selected_game_state.environment.boxes.contains(&vec);
+            let is_box = selected_game_state.environment.boxes.contains(&vec.into());
             let tile = match cell {
                 Cell::Wall => TileType::Wall,
                 Cell::Floor =>

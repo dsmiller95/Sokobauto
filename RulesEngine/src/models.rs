@@ -1,4 +1,4 @@
-pub(crate) use crate::core::{Cell, Vec2};
+pub(crate) use crate::core::{Cell};
 use crate::core::{GameChangeType, GameState};
 
 pub struct GameRenderState {

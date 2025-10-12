@@ -4,7 +4,7 @@ use crate::state_graph::models::{PopulateResult, StateGraph, UniqueNode};
 
 pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) -> Vec<UniqueNode> {
     let reachable_positions = shared.reachable_positions_visitation(&GameState {
-        player: from_node.minimum_reachable_player_position,
+        player: from_node.minimum_reachable_player_position.into(),
         environment: from_node.environment.clone(),
     });
     let actions = from_node.environment.boxes.iter()
@@ -31,7 +31,7 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
             let min_reachable_position = shared.min_reachable_position(&new_state);
             let new_node = UniqueNode {
                 environment: new_state.environment,
-                minimum_reachable_player_position: min_reachable_position,
+                minimum_reachable_player_position: min_reachable_position.into(),
             };
             Some(new_node)
         })

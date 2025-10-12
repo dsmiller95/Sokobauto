@@ -1,6 +1,7 @@
 use std::hint::black_box;
 use crate::core::Cell::{Wall};
-use crate::core::{Direction, GameChangeType, GameState, GameStateEnvironment, GameUpdate, SharedGameState, UserAction, Vec2, DEDUPLICATE_BOXES};
+use crate::core::{Direction, GameChangeType, GameState, GameStateEnvironment, GameUpdate, SharedGameState, UserAction, DEDUPLICATE_BOXES};
+use crate::core::models::Vec2;
 
 pub fn step(
     shared: &SharedGameState,

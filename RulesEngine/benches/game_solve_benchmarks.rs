@@ -1,7 +1,5 @@
-use std::arch::x86_64::_mm512_getexp_round_pd;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
 use std::hint::black_box;
-use std::time::Duration;
 use RulesEngine::console_interface::parse_level;
 use RulesEngine::state_graph::{StateGraph, UniqueNode, populate_step, get_all_adjacent_nodes, PopulateResult};
 
@@ -63,7 +61,7 @@ pub fn bench_game_solve_full_graph(c: &mut Criterion) {
                             .unwrap();
                         let first_node = UniqueNode {
                             environment: game_state.environment,
-                            minimum_reachable_player_position: min_reachable_position,
+                            minimum_reachable_player_position: min_reachable_position.into(),
                         };
                         state_graph.upsert_state(first_node);
                         (state_graph, shared)
@@ -105,7 +103,7 @@ pub fn bench_game_solve_single_node(c: &mut Criterion) {
                             .into_iter().min().unwrap();
                         let unique_node = UniqueNode {
                             environment: game_state.environment,
-                            minimum_reachable_player_position: min_reachable_position,
+                            minimum_reachable_player_position: min_reachable_position.into(),
                         };
                         (unique_node, shared)
                     },

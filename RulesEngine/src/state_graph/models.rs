@@ -1,5 +1,6 @@
-use crate::core::{GameStateEnvironment, Vec2};
+use crate::core::{GameStateEnvironment};
 use std::collections::{HashSet};
+use bevy::math::IVec2;
 
 #[derive(Clone)]
 pub struct StateGraph {
@@ -13,7 +14,7 @@ pub struct StateGraph {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct UniqueNode {
     pub environment: GameStateEnvironment,
-    pub minimum_reachable_player_position: Vec2,
+    pub minimum_reachable_player_position: IVec2,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]

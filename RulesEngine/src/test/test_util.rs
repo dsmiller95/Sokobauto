@@ -1,6 +1,7 @@
-﻿pub use dissimilar::diff as __diff;
+﻿use bevy::math::IVec2;
+pub use dissimilar::diff as __diff;
 use crate::console_interface::{parse_level, render_game_to_string};
-use crate::core::{step, Direction, GameState, GameUpdate, SharedGameState, UserAction, Vec2};
+use crate::core::{step, Direction, GameState, GameUpdate, SharedGameState, UserAction};
 
 #[macro_export]
 macro_rules! assert_eq_text {
@@ -87,15 +88,12 @@ impl GameTestState {
 
     pub fn render_symbols<F>(&self, get_char: F) -> String
     where
-        F: Fn(&Vec2) -> char,
+        F: Fn(&IVec2) -> char,
     {
         let mut result = String::new();
-        for i in 0..self.shared.height() {
-            for j in 0..self.shared.width() {
-                let pos = Vec2 {
-                    i: i as i32,
-                    j: j as i32,
-                };
+        for y in 0..self.shared.height() {
+            for x in 0..self.shared.width() {
+                let pos = IVec2 { y, x };
                 result.push(get_char(&pos));
             }
             result.push('\n');
@@ -103,9 +101,9 @@ impl GameTestState {
         result
     }
 
-    pub fn render_where_present(&self, positions: Vec<Vec2>, present: char, absent: char) -> String
+    pub fn render_where_present(&self, positions: Vec<IVec2>, present: char, absent: char) -> String
     {
-        let get_char = |pos: &Vec2| {
+        let get_char = |pos: &IVec2| {
             if positions.contains(pos) {
                 present
             } else {

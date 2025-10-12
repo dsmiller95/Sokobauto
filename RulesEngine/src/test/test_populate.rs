@@ -13,7 +13,7 @@ mod test {
 #  #
 "#;
         let game = GameTestState::new(level);
-        let reachable = game.shared.reachable_positions(&game.game_state);
+        let reachable = game.shared.reachable_positions(&game.game_state).into_iter().map(|x| x.into()).collect();
 
         let expected_symbols = r#"
 _**_
@@ -37,11 +37,11 @@ ____
         let game = GameTestState::new(level);
         let source_node = UniqueNode {
             environment: game.game_state.environment.clone(),
-            minimum_reachable_player_position: game.game_state.player,
+            minimum_reachable_player_position: game.game_state.player.into(),
         };
         let new_game_states: Vec<GameState> = get_all_adjacent_nodes(&source_node, &game.shared).into_iter()
             .map(|node| GameState {
-                player: node.minimum_reachable_player_position,
+                player: node.minimum_reachable_player_position.into(),
                 environment: node.environment,
             })
             .collect();

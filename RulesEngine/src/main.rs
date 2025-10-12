@@ -71,7 +71,7 @@ fn run_state_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut state_graph = StateGraph::new();
     let min_reachable_position = shared
-        .min_reachable_position(&game_state);
+        .min_reachable_position(&game_state).into();
     let first_node = UniqueNode {
         environment: game_state.environment,
         minimum_reachable_player_position: min_reachable_position,
