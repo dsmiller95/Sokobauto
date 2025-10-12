@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState, Vec2};
+use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState};
 use crate::state_graph::Edge;
 use crate::state_graph::models::{PopulateResult, StateGraph, UniqueNode};
 
@@ -10,7 +9,9 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
     });
     let actions = from_node.environment.boxes.iter()
         .flat_map(UserAction::all_push_actions_around)
-        .filter(|(box_pos, _)| reachable_positions.contains(box_pos) && reachable_positions[box_pos].is_reachable())
+        .filter(|(box_pos, _)| reachable_positions.get(&(*box_pos).into())
+            .map(|cell| cell.is_reachable())
+            .unwrap_or(false))
         .collect::<Vec<_>>();
 
     let next_states: Vec<UniqueNode> = actions.into_iter()

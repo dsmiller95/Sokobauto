@@ -1,5 +1,8 @@
+use std::ops::Deref;
+use bevy::math::IVec2;
 use crate::core::{Cell, Direction, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
 use crate::core::bounded_grid::BoundedGrid;
+use crate::core::bounds::BoundsOriginRoot;
 use crate::models::Vec2;
 
 pub struct WonCheckHelper {
@@ -25,11 +28,11 @@ impl SharedGameState {
         }
     }
 
-    pub fn area(&self) -> Vec2 {
-        Vec2 {
-            i: self.height(),
-            j: self.width(),
-        }
+    pub fn bounds(&self) -> BoundsOriginRoot {
+        BoundsOriginRoot::new(
+            self.width(),
+            self.height(),
+        )
     }
 
     pub fn get_won_check_helper(&self) -> WonCheckHelper {
@@ -77,18 +80,19 @@ impl SharedGameState {
     }
 
     pub fn reachable_positions(&self, game_state: &GameState) -> Vec<Vec2> {
-        let mut reachable = Vec::new();
+        let mut reachable = Vec::<Vec2>::new();
         self.visit_all_reachable_position(game_state, |pos| {
-            reachable.push(*pos);
+            reachable.push((*pos).into());
         });
         reachable
     }
 
     pub fn min_reachable_position(&self, game_state: &GameState) -> Vec2 {
         let mut min_reachable = Vec2 { i: i32::MAX, j: i32::MAX };
-        self.visit_all_reachable_position(game_state, |pos| {
-            if pos < &min_reachable {
-                min_reachable = *pos;
+        self.visit_all_reachable_position(game_state, |&pos| {
+            let pos: Vec2 = pos.into();
+            if pos < min_reachable {
+                min_reachable = pos;
             }
         });
         min_reachable
@@ -98,13 +102,14 @@ impl SharedGameState {
         self.visit_all_reachable_position(game_state, |_| {})
     }
 
-    fn visit_all_reachable_position(&self, game_state: &GameState, mut next_reachable: impl FnMut(&Vec2)) -> BoundedGrid<VisitationState> {
-        let mut visited = BoundedGrid::<VisitationState>::new(self.area(), VisitationState::Walkable);
-        let mut stack = vec![game_state.player];
+    fn visit_all_reachable_position(&self, game_state: &GameState, mut next_reachable: impl FnMut(&IVec2)) -> BoundedGrid<VisitationState> {
+        let mut visited = BoundedGrid::<VisitationState>::new(self.bounds(), VisitationState::Walkable);
+        let mut stack: Vec<IVec2> = vec![game_state.player.into()];
 
-        for box_pos in &game_state.environment.boxes {
-            if box_pos.inside(&self.area()) {
-                visited[box_pos] = VisitationState::Blocked;
+        for &box_pos in &game_state.environment.boxes {
+            let pos = box_pos.into();
+            if self.bounds().contains(&pos) {
+                visited[&pos] = VisitationState::Blocked;
             }
         }
 
@@ -146,7 +151,16 @@ impl std::ops::Index<Vec2> for SharedGameState {
     type Output = Cell;
 
     fn index(&self, index: Vec2) -> &Self::Output {
-        &self.grid[index.i as usize][index.j as usize]
+        let index: IVec2 = index.into();
+        &self[index]
+    }
+}
+
+impl std::ops::Index<IVec2> for SharedGameState {
+    type Output = Cell;
+
+    fn index(&self, index: IVec2) -> &Self::Output {
+        &self.grid[index.y as usize][index.x as usize]
     }
 }
 
@@ -171,8 +185,24 @@ impl Default for Vec2 {
     }
 }
 
-impl Vec2 {
-    pub fn neighbors(&self) -> [Vec2; 4] {
+impl From<IVec2> for Vec2 {
+    fn from(value: IVec2) -> Self {
+        Vec2 { i: value.y, j: value.x }
+    }
+}
+
+impl From<Vec2> for IVec2 {
+    fn from(value: Vec2) -> Self {
+        IVec2 { x: value.j, y: value.i }
+    }
+}
+
+pub trait Vec2GameLogicAdapter {
+    fn neighbors(&self) -> [Self; 4] where Self: Sized;
+}
+
+impl Vec2GameLogicAdapter for Vec2 {
+    fn neighbors(&self) -> [Vec2; 4] {
         [
             Vec2 { i: self.i - 1, j: self.j },
             Vec2 { i: self.i + 1, j: self.j },
@@ -180,7 +210,20 @@ impl Vec2 {
             Vec2 { i: self.i, j: self.j + 1 },
         ]
     }
+}
 
+impl Vec2GameLogicAdapter for IVec2 {
+    fn neighbors(&self) -> [IVec2; 4] {
+        [
+            IVec2 { y: self.y - 1, x: self.x },
+            IVec2 { y: self.y + 1, x: self.x },
+            IVec2 { y: self.y, x: self.x - 1 },
+            IVec2 { y: self.y, x: self.x + 1 },
+        ]
+    }
+}
+
+impl Vec2 {
     pub fn inside(&self, area: &Vec2) -> bool {
         self.i >= 0 && self.j >= 0 && self.i < area.i && self.j < area.j
     }

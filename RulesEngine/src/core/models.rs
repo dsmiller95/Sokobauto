@@ -13,6 +13,7 @@ pub struct Vec2 {
     pub j: i32,
 }
 
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
     Up,
