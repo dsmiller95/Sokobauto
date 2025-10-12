@@ -4,7 +4,7 @@ use rand::Rng;
 
 #[derive(Resource)]
 pub struct Tiles {
-    grid: Vec<Vec<TileType>>,
+    grids: Vec<Vec<Vec<TileType>>>,
     root: Vec3,
     cell_size: Vec2,
     grid_size: IVec2,
@@ -31,6 +31,7 @@ pub enum TileType {
 #[derive(Component)]
 pub struct TileSlot {
     pub location: IVec2,
+    pub depth: usize,
     pub tile_type: TileType,
 }
 
@@ -63,7 +64,7 @@ impl TileType {
 impl Tiles {
     pub fn new_empty() -> Tiles {
         Tiles {
-            grid: vec![],
+            grids: vec![],
             root: Vec3::splat(0.0),
             cell_size: Vec2::ZERO,
             grid_size: IVec2::splat(0),
@@ -82,7 +83,7 @@ impl Tiles {
             }
         }
         Tiles {
-            grid,
+            grids: vec![grid],
             // TODO: configure root from the top level module
             root: Vec3::new(200.0, 200.0, 0.0),
             cell_size: assets.tile_size,
@@ -92,11 +93,24 @@ impl Tiles {
         }
     }
 
-    pub fn assign_new_grid(&mut self, new_grid: Vec<Vec<TileType>>) {
-        self.grid = new_grid;
+    pub fn assign_new_grids(&mut self, new_grids: Vec<Vec<Vec<TileType>>>) {
+        if new_grids.is_empty() {
+            self.grids = new_grids;
+            return;
+        }
+
+        let y = new_grids[0].len();
+        let x = if y > 0 { new_grids[0][0].len() } else { 0 };
+
+        new_grids.iter().for_each(|grid| {
+            assert_eq!(grid.len(), y, "Grids must be uniform size");
+            grid.iter().for_each(|row| {
+                assert_eq!(row.len(), x, "Grids must be uniform size");
+            });
+        });
+
+        self.grids = new_grids;
         self.tile_contents_dirty = true;
-        let y = self.grid.len();
-        let x = if y > 0 { self.grid[0].len() } else { 0 };
         self.grid_size = IVec2::new(x as i32, y as i32);
     }
 
@@ -121,16 +135,30 @@ impl Tiles {
         self.rendered_grid_size = new_size;
     }
 
-    pub fn get_tile_at(&self, location: IVec2) -> TileType {
-        self.grid
-            .get(location.y as usize)
-            .and_then(|v| v.get(location.x as usize))
+    pub fn get_tile_count(&self) -> usize {
+        self.grids.len()
+    }
+
+    pub fn get_tiles_at(&self, location: &IVec2) -> impl Iterator<Item=TileType> {
+        self.grids.iter().map(move |grid|
+            grid
+                .get(location.y as usize)
+                .and_then(|v| v.get(location.x as usize))
+                .copied()
+                .unwrap_or(TileType::Empty)
+        )
+    }
+
+    pub fn get_tile_at(&self, slot: &TileSlot) -> TileType {
+        self.grids.get(slot.depth)
+            .and_then(|grid| grid.get(slot.location.y as usize))
+            .and_then(|v| v.get(slot.location.x as usize))
             .copied()
             .unwrap_or(TileType::Empty)
     }
 
-    pub fn get_tile_world_position(&self, location: IVec2) -> Vec3 {
-        (location.as_vec2() * self.cell_size).extend(0.0) + self.root
+    pub fn get_tile_world_position(&self, slot: &TileSlot) -> Vec3 {
+        (slot.location.as_vec2() * self.cell_size).extend(slot.depth as f32 * 0.1) + self.root
     }
 
     pub fn tiles_dirty(&self) -> bool {
@@ -165,10 +193,20 @@ impl TileAssets {
         }
     }
 
-    pub fn get_sprite_for_tile(&self, tile_type: TileType) -> Sprite {
+    pub fn get_sprite_for_tile(&self, tile_type: TileType, alpha: f32) -> Sprite {
         match self.images.get(&tile_type) {
-            Some(image) => Sprite::from_image(image.clone()),
-            None => Sprite::from_color(bevy::color::palettes::basic::MAROON, Vec2::splat(1.0)),
+            Some(image) => {
+                Sprite {
+                    image: image.clone(),
+                    color: Color::srgba(1.0, 1.0, 1.0, alpha),
+                    ..default()
+                }
+            },
+            None => {
+                let mut tmp_color = bevy::color::palettes::basic::MAROON;
+                tmp_color.alpha = alpha;
+                Sprite::from_color(tmp_color, Vec2::splat(1.0))
+            },
         }
     }
 }

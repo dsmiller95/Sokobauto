@@ -19,6 +19,7 @@ pub fn update_grid_size(
         return;
     }
 
+    // TODO: bug! we need to re-render if depth changed, too.
     let new_size = match tiles.get_new_rendered_size() {
         Some(size) => size,
         None => if tiles.is_added() { tiles.get_grid_size() } else { return; },
@@ -31,19 +32,26 @@ pub fn update_grid_size(
         commands.entity(entity).despawn();
     }
 
+    let total_tiles = tiles.get_tile_count();
+    let alpha = 1.0 / (total_tiles as f32);
+
     // respawn
     for x in 0..new_size.x {
         for y in 0..new_size.y {
             let location = IVec2 { x, y };
-            let tile_type = tiles.get_tile_at(location);
-            commands.spawn((
-                TileSlot {
+
+            for (depth, tile_type) in tiles.get_tiles_at(&location).enumerate() {
+                let slot = TileSlot {
                     tile_type,
+                    depth,
                     location,
-                },
-                Transform::from_translation(tiles.get_tile_world_position(location)),
-                tile_assets.get_sprite_for_tile(tile_type)
-            ));
+                };
+                commands.spawn((
+                    Transform::from_translation(tiles.get_tile_world_position(&slot)),
+                    slot,
+                    tile_assets.get_sprite_for_tile(tile_type, alpha)
+                ));
+            }
         }
     }
 
@@ -60,13 +68,16 @@ pub fn update_grid(
         return;
     }
 
+    let total_tiles = tiles.get_tile_count();
+    let alpha = 1.0 / (total_tiles as f32);
+
     for (mut tile_slot, mut sprite) in existing_tiles.iter_mut() {
-        let tile_type = tiles.get_tile_at(tile_slot.location);
+        let tile_type = tiles.get_tile_at(&tile_slot);
 
         if tile_type == tile_slot.tile_type { continue; }
         tile_slot.tile_type = tile_type;
 
-        *sprite = tile_assets.get_sprite_for_tile(tile_type);
+        *sprite = tile_assets.get_sprite_for_tile(tile_type, alpha);
     }
 
     tiles.mark_tiles_not_dirty();

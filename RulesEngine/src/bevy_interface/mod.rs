@@ -342,46 +342,61 @@ fn update_shader_edge_data(
 }
 
 fn visualize_playing_games(
-    selected_nodes: Query<(&GraphNode, &PlayingGameState), Changed<PlayingGameState>>,
+    any_changed: Query<Entity, Changed<PlayingGameState>>,
+    all_playing: Query<(&GraphNode, &PlayingGameState)>,
     source_graph_data: Res<SourceGraphData>,
     mut tiles: ResMut<Tiles>,
 ){
-    let Some((selected_node, playing_state)) = selected_nodes.iter().next() else {
+    if any_changed.is_empty() {
         return;
-    };
-
-    let Some(selected_game_state) = source_graph_data.graph.nodes.get_by_right(&selected_node.id) else {
-        eprintln!("Node not found {}", selected_node.id);
-        return;
-    };
-
-    let game_state = playing_state.apply_to_node(selected_game_state.clone());
-
-    let grid_size = IVec2::new(source_graph_data.shared.width(), source_graph_data.shared.height());
-    let mut new_grid = vec![vec![TileType::Empty; grid_size.x as usize]; grid_size.y as usize];
-    for x in 0..grid_size.x {
-        for y in 0..grid_size.y {
-            let cell = source_graph_data.shared.grid[y as usize][x as usize];
-            let vec = IVec2 { x, y };
-            let is_player = game_state.player == vec.into();
-            let is_box = game_state.environment.boxes.contains(&vec.into());
-            let tile = match cell {
-                Cell::Wall => TileType::Wall,
-                Cell::Floor =>
-                    if is_player { TileType::Player }
-                    else if is_box { TileType::Box }
-                    else { TileType::Floor } ,
-                Cell::Target =>
-                    if is_player { TileType::Player }
-                    else if is_box { TileType::Box }
-                    else { TileType::Target },
-            };
-
-            new_grid[(grid_size.y - y - 1) as usize][x as usize] = tile;
-        }
     }
 
-    tiles.assign_new_grid(new_grid)
+    // TODO: ideally, we would not iterate -every- node -every- time -any- game playing changed.
+    let all_games = all_playing.iter()
+        .filter_map(|(graph_node, playing_game_state)| {
+            let Some(selected_game_state) = source_graph_data.graph.nodes.get_by_right(&graph_node.id) else {
+                eprintln!("Node not found {}", graph_node.id);
+                return None;
+            };
+            let game_state = playing_game_state.apply_to_node(selected_game_state.clone());
+            Some(game_state)
+        })
+        .collect::<Vec<_>>();
+
+    let grid_size = IVec2::new(source_graph_data.shared.width(), source_graph_data.shared.height());
+
+    let new_grids = all_games.into_iter()
+        .map(|game_state| {
+            let mut new_grid = vec![vec![TileType::Empty; grid_size.x as usize]; grid_size.y as usize];
+            for x in 0..grid_size.x {
+                for y in 0..grid_size.y {
+                    let cell = source_graph_data.shared.grid[y as usize][x as usize];
+                    let vec = IVec2 { x, y };
+                    let is_player = game_state.player == vec.into();
+                    let is_box = game_state.environment.boxes.contains(&vec.into());
+                    let tile = match cell {
+                        Cell::Wall => TileType::Wall,
+                        Cell::Floor =>
+                            if is_player { TileType::Player }
+                            else if is_box { TileType::Box }
+                            else { TileType::Floor } ,
+                        Cell::Target =>
+                            if is_player { TileType::Player }
+                            else if is_box { TileType::Box }
+                            else { TileType::Target },
+                    };
+
+                    new_grid[(grid_size.y - y - 1) as usize][x as usize] = tile;
+                }
+            }
+
+            new_grid
+        })
+        .collect::<Vec<_>>();
+
+    println!("{} total grids", new_grids.len());
+
+    tiles.assign_new_grids(new_grids)
 }
 
 fn focus_newly_selected_node(
@@ -404,8 +419,7 @@ fn select_nodes_with_playing_games(
     to_select: Query<Entity, (With<PlayingGameState>, Without<SelectedNode>)>,
     to_unselect: Query<Entity, (Without<PlayingGameState>, With<SelectedNode>)>,
 ) {
-    for entity in to_select.iter() {
-        commands.entity(entity).insert(SelectedNode);
+    for entity in to_select.iter() {        commands.entity(entity).insert(SelectedNode);
     }
     for entity in to_unselect.iter() {
         commands.entity(entity).remove::<SelectedNode>();

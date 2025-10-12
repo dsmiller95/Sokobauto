@@ -24,23 +24,23 @@ use std::io::Write;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let switch = std::env::args().nth(1).unwrap_or("interactive".to_string());
 
-//     let level = r#"
-//        ####
-// ########  ##
-// #          ###
-// # @$$ ##   ..#
-// # $$   ##  ..#
-// #         ####
-// ###########
-// "#;
-        let level = r#"
-########
-# @$  .#
-# $  $ #
-# .# $ #
-#..#   #
-########
-    "#;
+    let level = r#"
+       ####
+########  ##
+#          ###
+# @$$ ##   ..#
+# $$   ##  ..#
+#         ####
+###########
+"#;
+//         let level = r#"
+// ########
+// # @$  .#
+// # $  $ #
+// # .# $ #
+// #..#   #
+// ########
+//     "#;
 
     let (game_state, shared) = parse_level(level);
     let mut terminal = setup_terminal()?;
