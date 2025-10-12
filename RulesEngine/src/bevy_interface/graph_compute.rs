@@ -90,6 +90,10 @@ impl GraphComputeCache {
             .into_iter()
             .flatten()
     }
+
+    pub fn get_entity(&self, node_id: &usize) -> Option<&Entity> {
+        self.entity_map.get(node_id)
+    }
 }
 
 impl NodeIdToIndex {

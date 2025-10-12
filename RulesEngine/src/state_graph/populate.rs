@@ -1,6 +1,7 @@
 use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState};
 use crate::state_graph::Edge;
-use crate::state_graph::models::{PopulateResult, StateGraph, UniqueNode};
+use crate::state_graph::models::{PopulateResult, StateGraph};
+use crate::state_graph::unique_node::UniqueNode;
 
 pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) -> Vec<UniqueNode> {
     let reachable_positions = shared.reachable_positions_visitation(&GameState {
@@ -28,12 +29,7 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
                 return None;
             }
 
-            let min_reachable_position = shared.min_reachable_position(&new_state);
-            let new_node = UniqueNode {
-                environment: new_state.environment,
-                minimum_reachable_player_position: min_reachable_position.into(),
-            };
-            Some(new_node)
+            Some(UniqueNode::from_game_state(new_state, shared))
         })
         .collect();
 

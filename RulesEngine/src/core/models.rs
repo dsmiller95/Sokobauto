@@ -14,7 +14,7 @@ pub struct Vec2 {
 }
 
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Direction {
     Up,
     Down,
@@ -22,7 +22,7 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum UserAction {
     Move(Direction),
 }

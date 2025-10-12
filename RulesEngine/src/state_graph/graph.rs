@@ -1,5 +1,6 @@
-use crate::state_graph::models::{Edge, StateGraph, UniqueNode};
+use crate::state_graph::models::{Edge, StateGraph};
 use std::collections::{HashSet};
+use crate::state_graph::UniqueNode;
 
 impl StateGraph {
     pub fn new() -> Self {

@@ -2,7 +2,9 @@
 use bevy::input::keyboard::Key;
 use bevy::prelude::*;
 use crate::bevy_interface::{GraphNode, SourceGraphData};
-use crate::core::{Direction, UserAction};
+use crate::bevy_interface::graph_compute::GraphComputeCache;
+use crate::core::{step, Direction, GameChangeType, GameState, GameUpdate, SharedGameState, UserAction};
+use crate::state_graph::UniqueNode;
 
 /// Placed on any Node which is currently being played, to represent the unique
 /// state not already captured by that node ?? ? ? ??
@@ -22,6 +24,30 @@ impl Plugin for SelectedGameNavigationPlugin {
     }
 }
 
+impl PlayingGameState {
+    pub fn new_playing_state(node: &UniqueNode) -> Self {
+        PlayingGameState {
+            player_pos: node.minimum_reachable_player_position,
+        }
+    }
+
+    pub fn apply_to_node(&self, node: UniqueNode) -> GameState {
+        GameState {
+            environment: node.environment,
+            player: self.player_pos.into(),
+        }
+    }
+
+    pub fn extract_from_state(state: GameState, shared: &SharedGameState) -> (Self, UniqueNode) {
+        (
+            PlayingGameState {
+                player_pos: state.player.into(),
+            },
+            UniqueNode::from_game_state(state, shared),
+        )
+    }
+}
+
 fn user_action_from_input(input: &ButtonInput<Key>) -> Option<UserAction> {
     if input.just_pressed(Key::ArrowDown) {
         Some(UserAction::Move(Direction::Down))
@@ -36,18 +62,55 @@ fn user_action_from_input(input: &ButtonInput<Key>) -> Option<UserAction> {
     }
 }
 
+/// Whenever a user inputs an action
+/// Apply that action to the game state associated with each PlayingGameState.
+/// Then modify the PlayingGameState to hold the new player position.
+/// Or, if that particular game transitioned to a new game state (node),
+/// move the PlayingGameState to the new node.
 fn process_game_input(
     mut commands: Commands,
     mut play_states: Query<(Entity, &mut PlayingGameState, &GraphNode)>,
-    mut game_graph_data: Res<SourceGraphData>,
+    game_graph_data: Res<SourceGraphData>,
+    graph_entity_lookup: Res<GraphComputeCache>,
     input: Res<ButtonInput<Key>>
 ) {
     let Some(action) = user_action_from_input(&input) else {
         return;
     };
 
-    // TODO: apply the action to every game state which has a PlayingGameState
-    //  then either update the playing game state or remove it + re-add to a new node
+    println!("taking action {:?}", action);
 
-    todo!()
+    let shared = &game_graph_data.shared;
+
+    for (entity, mut playing_game_state, node) in play_states.iter_mut() {
+        let game_node = game_graph_data.graph.nodes.get_by_right(&node.id).expect("game node not found!");
+        let game_state = playing_game_state.apply_to_node(game_node.clone());
+        let update = step(shared, &game_state, action);
+
+        match update {
+            GameUpdate::Error(_) => {
+                commands.entity(entity).remove::<PlayingGameState>();
+            }
+            GameUpdate::NextState(game_state, GameChangeType::PlayerMove) => {
+                playing_game_state.player_pos = game_state.player.into();
+            }
+            GameUpdate::NextState(game_state, GameChangeType::PlayerAndBoxMove) => {
+                let (new_playing, new_node) = PlayingGameState::extract_from_state(game_state, shared);
+                let new_game_id = game_graph_data.graph.nodes.get_by_left(&new_node);
+
+                commands.entity(entity).remove::<PlayingGameState>();
+                let Some(new_game_id) = new_game_id else {
+                    // if the game does not exist in the graph, we drop the game. it will be lost.
+                    return;
+                };
+
+                let Some(&entity) = graph_entity_lookup.get_entity(new_game_id) else {
+                    eprintln!("Could not find game entity for game ID {:?}", new_game_id);
+                    return;
+                };
+
+                commands.entity(entity).insert(new_playing);
+            }
+        }
+    }
 }

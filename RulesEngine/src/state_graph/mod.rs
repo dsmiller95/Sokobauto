@@ -5,10 +5,12 @@ mod json_export;
 mod models;
 mod populate;
 mod graph_trim;
+mod unique_node;
 
 pub use console_interface::*;
 pub use fdg_interface::render_interactive_graph;
 pub use json_export::get_json_data;
 pub use models::*;
+pub use unique_node::*;
 pub use populate::{populate_step, get_all_adjacent_nodes};
 pub use graph_trim::trim_unwinnable;

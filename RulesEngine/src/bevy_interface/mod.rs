@@ -27,7 +27,7 @@ use crate::bevy_interface::octree_visualization::{setup_octree_visualization, up
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
-use crate::bevy_interface::selected_game_navigation::SelectedGameNavigationPlugin;
+use crate::bevy_interface::selected_game_navigation::{PlayingGameState, SelectedGameNavigationPlugin};
 use crate::bevy_interface::tile_render::{TileRenderPlugin, TileType, Tiles};
 
 const RENDER_NODES: bool = black_box(true);
@@ -155,7 +155,9 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_systems(Update, (
             apply_forces_and_update_octree, update_octree_visualization,
             update_fps_counter,
-            handle_toggle_interactions, select_random_node_when_space_bar_pressed,
+            handle_toggle_interactions,
+            start_playing_random_node_when_space_pressed, // select_random_adjacent_node_when_space_bar_pressed,
+            select_nodes_with_playing_games,
             visualize_newly_selected_node_game
         ));
 
@@ -379,13 +381,44 @@ fn visualize_newly_selected_node_game(
     tiles.assign_new_grid(new_grid)
 }
 
-fn select_random_node_when_space_bar_pressed(
+fn select_nodes_with_playing_games(
+    mut commands: Commands,
+    to_select: Query<Entity, (With<PlayingGameState>, Without<SelectedNode>)>,
+    to_unselect: Query<Entity, (Without<PlayingGameState>, With<SelectedNode>)>,
+) {
+    for entity in to_select.iter() {
+        commands.entity(entity).insert(SelectedNode);
+    }
+    for entity in to_unselect.iter() {
+        commands.entity(entity).remove::<SelectedNode>();
+    }
+}
+
+fn start_playing_random_node_when_space_pressed(
+    mut commands: Commands,
+    unplaying_nodes: Query<(Entity, &GraphNode), Without<PlayingGameState>>,
+    graph_data: Res<SourceGraphData>,
+    button_input: Res<ButtonInput<Key>>
+) {
+    if !button_input.just_pressed(Key::Space) {
+        return;
+    }
+
+    use rand::seq::IteratorRandom;
+    let mut rng = rand::rng();
+
+    let (to_play, graph_node) = unplaying_nodes.iter().choose(&mut rng).expect("all nodes already being played?");
+    let unique_node = graph_data.graph.nodes.get_by_right(&graph_node.id).expect("node id not found");
+    commands.entity(to_play).insert(PlayingGameState::new_playing_state(unique_node));
+}
+
+fn select_random_adjacent_node_when_space_bar_pressed(
     mut commands: Commands,
     unselected_nodes: Query<(Entity, &GraphNode), Without<SelectedNode>>,
     selected_nodes: Query<(Entity, &GraphNode), With<SelectedNode>>,
     graph_data: Res<GraphData>,
     button_input: Res<ButtonInput<Key>>
-){
+) {
     if !button_input.just_pressed(Key::Space) {
         return;
     }

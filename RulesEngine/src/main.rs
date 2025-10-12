@@ -70,12 +70,7 @@ fn run_state_graph(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut state_graph = StateGraph::new();
-    let min_reachable_position = shared
-        .min_reachable_position(&game_state).into();
-    let first_node = UniqueNode {
-        environment: game_state.environment,
-        minimum_reachable_player_position: min_reachable_position,
-    };
+    let first_node = UniqueNode::from_game_state(game_state, shared);
     state_graph.upsert_state(first_node);
 
     let start_time = std::time::Instant::now();
