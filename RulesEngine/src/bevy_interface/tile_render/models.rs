@@ -7,8 +7,8 @@ pub struct Tiles {
     grids: Vec<Vec<Vec<TileType>>>,
     root: Vec3,
     cell_size: Vec2,
-    grid_size: IVec2,
-    rendered_grid_size: IVec2,
+    grid_size: IVec3,
+    rendered_grid_size: IVec3,
     tile_contents_dirty: bool,
 }
 
@@ -67,14 +67,14 @@ impl Tiles {
             grids: vec![],
             root: Vec3::splat(0.0),
             cell_size: Vec2::ZERO,
-            grid_size: IVec2::splat(0),
-            rendered_grid_size: IVec2::splat(0),
+            grid_size: IVec3::splat(0),
+            rendered_grid_size: IVec3::splat(0),
             tile_contents_dirty: false,
         }
     }
 
     pub fn new_random(assets: &TileAssets) -> Tiles {
-        let grid_size = IVec2::new(10, 10);
+        let grid_size = IVec3::new(10, 10, 1);
         let mut rng = rand::rng();
         let mut grid = vec![vec![TileType::Empty; grid_size.x as usize]; grid_size.y as usize];
         for x in 0..grid_size.x as usize {
@@ -101,6 +101,7 @@ impl Tiles {
 
         let y = new_grids[0].len();
         let x = if y > 0 { new_grids[0][0].len() } else { 0 };
+        let depth = new_grids.len();
 
         new_grids.iter().for_each(|grid| {
             assert_eq!(grid.len(), y, "Grids must be uniform size");
@@ -111,15 +112,15 @@ impl Tiles {
 
         self.grids = new_grids;
         self.tile_contents_dirty = true;
-        self.grid_size = IVec2::new(x as i32, y as i32);
+        self.grid_size = IVec3::new(x as i32, y as i32, depth as i32);
     }
 
-    pub fn get_grid_size(&self) -> IVec2 {
+    pub fn get_grid_size(&self) -> IVec3 {
         self.grid_size
     }
 
     /// If the grid size does not match the rendered size, this returns the new size. Otherwise None
-    pub fn get_new_rendered_size(&self) -> Option<IVec2> {
+    pub fn get_new_rendered_size(&self) -> Option<IVec3> {
         if self.grid_size == self.rendered_grid_size {
             None
         }else {
@@ -128,7 +129,7 @@ impl Tiles {
     }
 
     /// Mark that the grid rendered to the given new size.
-    pub fn mark_grid_rendered_to_size(&mut self, new_size: IVec2) {
+    pub fn mark_grid_rendered_to_size(&mut self, new_size: IVec3) {
         if self.grid_size != new_size {
             eprintln!("Warning: grid size rendered to {:?}, does not match current grid size {:?}", new_size, self.grid_size);
         }
