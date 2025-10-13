@@ -158,11 +158,11 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             update_fps_counter,
             handle_toggle_interactions))
         .add_systems(Update, (
-            start_playing_random_node_when_space_pressed, // select_random_adjacent_node_when_space_bar_pressed,
+            on_space_pressed_clear_playing_nodes, // select_random_adjacent_node_when_space_bar_pressed,
             select_nodes_with_playing_games,
             visualize_playing_games,
-            focus_newly_selected_node,
-        )).add_observer(on_node_clicked_start_playing_game);
+            focus_newly_selected_nodes,
+        )).add_observer(on_node_clicked_toggle_playing_game);
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
         .add_systems(Update, update_shader_edge_data);
@@ -401,16 +401,21 @@ fn visualize_playing_games(
     tiles.assign_new_grids(new_grids)
 }
 
-fn focus_newly_selected_node(
+fn focus_newly_selected_nodes(
     selected_nodes: Query<&Transform, Added<SelectedNode>>,
     mut orbit_cameras: Query<&mut PanOrbitCamera>,
 ){
-    let Ok(selected_transform) = selected_nodes.single() else {
+    if selected_nodes.is_empty() {
         return;
-    };
-
-    let new_focus = selected_transform.translation;
-
+    }
+    let location_sums = selected_nodes.iter()
+        .map(|transform| {
+            transform.translation
+        })
+        .fold((0, Vec3::splat(0.0)), |acc, elem| {
+            (acc.0 + 1, acc.1 + elem)
+        });
+    let new_focus = location_sums.1 / (location_sums.0 as f32);
     for mut orbit_camera in orbit_cameras.iter_mut() {
         orbit_camera.target_focus = new_focus;
     }
@@ -421,14 +426,29 @@ fn select_nodes_with_playing_games(
     to_select: Query<Entity, (With<PlayingGameState>, Without<SelectedNode>)>,
     to_unselect: Query<Entity, (Without<PlayingGameState>, With<SelectedNode>)>,
 ) {
-    for entity in to_select.iter() {        commands.entity(entity).insert(SelectedNode);
+    for entity in to_select.iter() {
+        commands.entity(entity).insert(SelectedNode);
     }
     for entity in to_unselect.iter() {
         commands.entity(entity).remove::<SelectedNode>();
     }
 }
 
-fn start_playing_random_node_when_space_pressed(
+fn on_space_pressed_clear_playing_nodes(
+    mut commands: Commands,
+    playing_nodes: Query<(Entity), With<PlayingGameState>>,
+    button_input: Res<ButtonInput<Key>>
+) {
+    if !button_input.just_pressed(Key::Space) {
+        return;
+    }
+
+    for entity in playing_nodes.iter() {
+        commands.entity(entity).remove::<PlayingGameState>();
+    }
+}
+
+fn on_space_pressed_start_playing_random_node(
     mut commands: Commands,
     unplaying_nodes: Query<(Entity, &GraphNode), Without<PlayingGameState>>,
     graph_data: Res<SourceGraphData>,
@@ -446,20 +466,29 @@ fn start_playing_random_node_when_space_pressed(
     commands.entity(to_play).insert(PlayingGameState::new_playing_state(unique_node));
 }
 
-fn on_node_clicked_start_playing_game(
+fn on_node_clicked_toggle_playing_game(
     clicked: On<Pointer<Click>>,
     mut commands: Commands,
     graph_data: Res<SourceGraphData>,
-    graph_nodes: Query<&GraphNode>
+    graph_nodes: Query<(&GraphNode, Option<&PlayingGameState>)>,
 ) {
     let clicked_entity = clicked.entity;
-    let Ok(clicked_node) = graph_nodes.get(clicked_entity) else {
+    let Ok((clicked_node, playing_game_state)) = graph_nodes.get(clicked_entity) else {
         eprintln!("Clicked on a non-node!");
         return;
     };
 
-    let unique_node = graph_data.graph.nodes.get_by_right(&clicked_node.id).expect("node id not found");
-    commands.entity(clicked_entity).insert(PlayingGameState::new_playing_state(unique_node));
+    match playing_game_state {
+        Some(graph_node) => {
+            println!("Deselecting {}", clicked_node.id);
+            commands.entity(clicked_entity).remove::<PlayingGameState>();
+        }
+        None => {
+            println!("Selecting {}", clicked_node.id);
+            let unique_node = graph_data.graph.nodes.get_by_right(&clicked_node.id).expect("node id not found");
+            commands.entity(clicked_entity).insert(PlayingGameState::new_playing_state(unique_node));
+        }
+    }
 }
 
 fn select_random_adjacent_node_when_space_bar_pressed(

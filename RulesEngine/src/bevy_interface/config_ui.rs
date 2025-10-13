@@ -128,7 +128,7 @@ impl SliderType {
         }
     }
 
-    pub fn get_value(&self, config: &OctreeVisualizationConfig, user_config: &UserConfig, physics_config: &PhysicsConfig) -> f32 {
+    pub fn get_value(&self, _config: &OctreeVisualizationConfig, user_config: &UserConfig, physics_config: &PhysicsConfig) -> f32 {
         match self {
             SliderType::NodeSizeMultiplier => user_config.node_size_multiplier.sqrt(),
             SliderType::RepulsionStrength => physics_config.repulsion_strength,

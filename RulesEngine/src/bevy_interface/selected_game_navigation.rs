@@ -97,12 +97,13 @@ fn process_game_input(
             GameUpdate::NextState(game_state, GameChangeType::PlayerAndBoxMove) => {
                 let (new_playing, new_node) = PlayingGameState::extract_from_state(game_state, shared);
                 let new_game_id = game_graph_data.graph.nodes.get_by_left(&new_node);
-
-                commands.entity(entity).remove::<PlayingGameState>();
                 let Some(new_game_id) = new_game_id else {
-                    // if the game does not exist in the graph, we drop the game. it will be lost.
+                    // if the game does not exist in the graph, we abort the move. the game will remain.
+                    println!("Action would end game. Aborting for game {:}", node.id);
                     return;
                 };
+                
+                commands.entity(entity).remove::<PlayingGameState>();
 
                 let Some(&entity) = graph_entity_lookup.get_entity(new_game_id) else {
                     eprintln!("Could not find game entity for game ID {:?}", new_game_id);
