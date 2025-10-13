@@ -126,6 +126,7 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(WireframePlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(MeshPickingPlugin::default())
         .insert_resource(source_data)
         .insert_resource(user_config)
         .insert_resource(graph_data)
@@ -155,12 +156,13 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
         .add_systems(Update, (
             apply_forces_and_update_octree, update_octree_visualization,
             update_fps_counter,
-            handle_toggle_interactions,
+            handle_toggle_interactions))
+        .add_systems(Update, (
             start_playing_random_node_when_space_pressed, // select_random_adjacent_node_when_space_bar_pressed,
             select_nodes_with_playing_games,
             visualize_playing_games,
             focus_newly_selected_node,
-        ));
+        )).add_observer(on_node_clicked_start_playing_game);
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
         .add_systems(Update, update_shader_edge_data);
@@ -442,6 +444,22 @@ fn start_playing_random_node_when_space_pressed(
     let (to_play, graph_node) = unplaying_nodes.iter().choose(&mut rng).expect("all nodes already being played?");
     let unique_node = graph_data.graph.nodes.get_by_right(&graph_node.id).expect("node id not found");
     commands.entity(to_play).insert(PlayingGameState::new_playing_state(unique_node));
+}
+
+fn on_node_clicked_start_playing_game(
+    clicked: On<Pointer<Click>>,
+    mut commands: Commands,
+    graph_data: Res<SourceGraphData>,
+    graph_nodes: Query<&GraphNode>
+) {
+    let clicked_entity = clicked.entity;
+    let Ok(clicked_node) = graph_nodes.get(clicked_entity) else {
+        eprintln!("Clicked on a non-node!");
+        return;
+    };
+
+    let unique_node = graph_data.graph.nodes.get_by_right(&clicked_node.id).expect("node id not found");
+    commands.entity(clicked_entity).insert(PlayingGameState::new_playing_state(unique_node));
 }
 
 fn select_random_adjacent_node_when_space_bar_pressed(
