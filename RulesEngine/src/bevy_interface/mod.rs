@@ -375,7 +375,7 @@ fn visualize_playing_games(
                     let cell = source_graph_data.shared.grid[y as usize][x as usize];
                     let vec = IVec2 { x, y };
                     let is_player = game_state.player == vec.into();
-                    let is_box = game_state.environment.boxes.contains(&vec.into());
+                    let is_box = game_state.environment.has_box_at(&vec.into());
                     let tile = match cell {
                         Cell::Wall => TileType::Wall,
                         Cell::Floor =>

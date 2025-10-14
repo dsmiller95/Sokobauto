@@ -22,7 +22,7 @@ struct JsonEdge {
 
 pub fn get_json_data(graph: &StateGraph, shared: &SharedGameState) -> String {
     let nodes: Vec<JsonNode> = graph.nodes.iter().map(|(state, id)| {
-        let on_targets = shared.count_boxes_on_goals(&state.environment.boxes);
+        let on_targets = shared.count_boxes_on_goals(&state.environment);
         JsonNode {
             id: *id,
             on_targets,

@@ -63,10 +63,6 @@ pub fn parse_level(s: &str) -> (GameState, SharedGameState) {
         y += 1;
     }
 
-    if black_box(DEDUPLICATE_BOXES) {
-        boxes.sort_by(Vec2GameLogicAdapter::cmp);
-    }
-
     (
         GameState {
             player: player.into(),
@@ -149,7 +145,7 @@ pub fn render_game_to_string(shared: &SharedGameState, game: &GameState) -> Stri
                 x: x as i32,
             };
             let has_player = pos == game.player.into();
-            let has_box = game.environment.boxes.contains(&pos.into());
+            let has_box = game.environment.has_box_at(&pos.into());
             let ch = match c {
                 Wall => '#',
                 Floor => if has_player { '@' } else { if has_box { '$' } else { ' ' } },

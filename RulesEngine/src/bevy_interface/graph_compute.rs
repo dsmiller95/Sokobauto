@@ -42,7 +42,7 @@ impl GraphData {
         let nodes: Vec<GraphNodeData> = graph.nodes.iter()
             .map(|(state, &id)| GraphNodeData {
                 id,
-                on_targets: shared.count_boxes_on_goals(&state.environment.boxes),
+                on_targets: shared.count_boxes_on_goals(&state.environment),
             })
             .collect();
 

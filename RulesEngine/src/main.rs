@@ -133,15 +133,15 @@ fn run_state_graph(
              trimmed_stats.edges_removed(), trimmed_stats.edges_removed_percentage());
     println!("{}", get_graph_info(&state_graph));
 
-    let json_data = get_json_data(&state_graph, shared);
-
-    std::fs::create_dir_all("exports")?;
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open("exports/state_graph.json")?;
-    f.write_all(json_data.as_bytes())?;
-    println!("State graph exported to exports/state_graph.json");
+    // let json_data = get_json_data(&state_graph, shared);
+    // 
+    // std::fs::create_dir_all("exports")?;
+    // let mut f = std::fs::OpenOptions::new()
+    //     .write(true)
+    //     .truncate(true)
+    //     .open("exports/state_graph.json")?;
+    // f.write_all(json_data.as_bytes())?;
+    // println!("State graph exported to exports/state_graph.json");
 
     // render_interactive_graph(&state_graph);
     

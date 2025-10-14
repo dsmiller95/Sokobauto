@@ -8,7 +8,7 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
         player: from_node.minimum_reachable_player_position.into(),
         environment: from_node.environment.clone(),
     });
-    let actions = from_node.environment.boxes.iter()
+    let actions = from_node.environment.iter_boxes()
         .flat_map(UserAction::all_push_actions_around)
         .filter(|(box_pos, _)| reachable_positions.get(&(*box_pos).into())
             .map(|cell| cell.is_reachable())

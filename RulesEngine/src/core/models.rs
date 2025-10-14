@@ -1,3 +1,5 @@
+use crate::core::game_state_environment::GameStateEnvironment;
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cell {
     Wall,
@@ -37,11 +39,6 @@ pub struct SharedGameState {
 pub struct GameState {
     pub environment: GameStateEnvironment,
     pub player: Vec2,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct GameStateEnvironment {
-    pub boxes: Vec<Vec2>,
 }
 
 #[derive(Debug)]

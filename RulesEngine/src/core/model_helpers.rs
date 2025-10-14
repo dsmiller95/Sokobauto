@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 use bevy::math::IVec2;
-use crate::core::{Cell, Direction, GameChangeType, GameState, GameStateEnvironment, SharedGameState, UserAction};
+use crate::core::{Cell, Direction, GameChangeType, GameState, SharedGameState, UserAction};
 use crate::core::bounded_grid::BoundedGrid;
 use crate::core::bounds::BoundsOriginRoot;
+use crate::core::game_state_environment::GameStateEnvironment;
 use crate::core::models::Vec2;
 
 pub struct WonCheckHelper {
@@ -11,7 +12,7 @@ pub struct WonCheckHelper {
 
 impl WonCheckHelper {
     pub fn is_won(&self, game_state: &GameStateEnvironment) -> bool {
-        self.target_positions_sorted.iter().all(|p| game_state.boxes.contains(p))
+        self.target_positions_sorted.iter().all(|p| game_state.has_box_at(p))
     }
 }
 
@@ -61,7 +62,7 @@ impl SharedGameState {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
                     let pos = Vec2 { i: i as i8, j: j as i8 };
-                    if !game_state.environment.boxes.contains(&pos) {
+                    if !game_state.environment.has_box_at(&pos) {
                         return false;
                     }
                 }
@@ -70,13 +71,13 @@ impl SharedGameState {
         true
     }
 
-    pub fn count_boxes_on_goals(&self, boxes: &Vec<Vec2>) -> usize {
+    pub fn count_boxes_on_goals(&self, environment: &GameStateEnvironment) -> usize {
         let mut count = 0;
         for (i, row) in self.grid.iter().enumerate() {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
                     let pos = Vec2 { i: i as i8, j: j as i8 };
-                    if boxes.contains(&pos) {
+                    if environment.has_box_at(&pos) {
                         count += 1;
                     }
                 }
@@ -112,7 +113,7 @@ impl SharedGameState {
         let mut visited = BoundedGrid::<VisitationState>::new(self.bounds(), VisitationState::Walkable);
         let mut stack: Vec<IVec2> = vec![game_state.player.into()];
 
-        for &box_pos in &game_state.environment.boxes {
+        for &box_pos in game_state.environment.iter_boxes() {
             let pos = box_pos.into();
             if self.bounds().contains(&pos) {
                 visited[&pos] = VisitationState::Blocked;
@@ -284,13 +285,5 @@ impl GameChangeType {
 impl Cell {
     pub fn is_walkable(&self) -> bool {
         *self != Cell::Wall
-    }
-}
-
-impl GameStateEnvironment {
-    pub fn new(boxes: Vec<IVec2>) -> GameStateEnvironment {
-        GameStateEnvironment {
-            boxes: boxes.into_iter().map(|x| x.into()).collect(),
-        }
     }
 }

@@ -26,8 +26,8 @@ pub fn step(
 
     let dest = shared.grid[ni as usize][nj as usize];
 
-    let pushing = game.environment.boxes.iter().position(|&x| x == dest_pos);
-    let mut new_boxes = game.environment.boxes.clone();
+    let pushing = game.environment.index_of_box_at(&dest_pos);
+    let mut new_environment = game.environment.clone();
     if let Some(pushed_box_index) = pushing {
         let bi = ni + dir.i;
         let bj = nj + dir.j;
@@ -42,14 +42,12 @@ pub fn step(
         if beyond == Wall {
             return GameUpdate::Error("Cannot push block into wall".to_string());
         }
-        if game.environment.boxes.contains(&new_box_pos) {
+        if game.environment.has_box_at(&new_box_pos) {
             return GameUpdate::Error("Cannot push block into another block".to_string());
         }
 
-        new_boxes[pushed_box_index] = new_box_pos;
-        if black_box(DEDUPLICATE_BOXES) {
-            new_boxes.sort()
-        }
+        new_environment.set_box(pushed_box_index, &new_box_pos);
+        new_environment.complete_moves();
     } else {
         if dest == Wall {
             return GameUpdate::Error("Cannot walk into a wall".to_string());
@@ -59,9 +57,7 @@ pub fn step(
     GameUpdate::NextState(
         GameState {
             player: dest_pos,
-            environment: GameStateEnvironment {
-                boxes: new_boxes,
-            },
+            environment: new_environment,
         },
         if pushing.is_some() {
             GameChangeType::PlayerAndBoxMove
