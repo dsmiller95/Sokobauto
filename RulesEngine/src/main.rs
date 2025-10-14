@@ -93,7 +93,13 @@ fn run_state_graph(
     let mut last_render_time = start_time;
     let mut processed_since_last_render = 0;
 
-    render_graph(terminal, GraphRenderState {
+    let mut log_out = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open("exports/solve_log.log")?;
+
+    render_graph(terminal, &mut log_out, GraphRenderState {
         graph: &state_graph,
         processed_since_last_render,
         start_time,
@@ -111,7 +117,7 @@ fn run_state_graph(
         }
 
         let current_time = std::time::Instant::now();
-        render_graph(terminal, GraphRenderState {
+        render_graph(terminal, &mut log_out, GraphRenderState {
             graph: &state_graph,
             processed_since_last_render,
             start_time,
