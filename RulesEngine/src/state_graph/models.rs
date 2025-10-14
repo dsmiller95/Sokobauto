@@ -1,4 +1,4 @@
-use std::collections::{HashSet};
+use std::collections::{HashSet, VecDeque};
 use crate::state_graph::unique_node::UniqueNode;
 
 #[derive(Clone)]
@@ -7,6 +7,7 @@ pub struct StateGraph {
     pub nodes: bimap::BiMap<UniqueNode, usize>,
     pub edges: HashSet<Edge>,
     pub unvisited: HashSet<usize>,
+    pub next_unvisted: VecDeque<usize>,
     pub next_id: usize,
 }
 

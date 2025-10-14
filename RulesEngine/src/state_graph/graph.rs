@@ -1,5 +1,5 @@
 use crate::state_graph::models::{Edge, StateGraph};
-use std::collections::{HashSet};
+use std::collections::{HashSet, VecDeque};
 use crate::state_graph::UniqueNode;
 
 impl StateGraph {
@@ -8,6 +8,7 @@ impl StateGraph {
             nodes: bimap::BiMap::new(),
             edges: HashSet::new(),
             unvisited: HashSet::new(),
+            next_unvisted: VecDeque::new(),
             next_id: 0,
         }
     }
@@ -22,6 +23,7 @@ impl StateGraph {
             // we know that this insertion is unique, because id is unique, and we just checked to ensure that te state is unique
             self.nodes.insert_no_overwrite(state, id).unwrap();
             self.unvisited.insert(id);
+            self.next_unvisted.push_back(id);
             id
         }
     }
@@ -34,15 +36,17 @@ impl StateGraph {
         self.edges.insert(edge);
     }
 
-    pub fn mark_visited(&mut self, node_id: usize) {
-        self.unvisited.remove(&node_id);
-    }
-
-    pub fn get_unvisited_node(&self) -> Option<usize> {
-        self.unvisited.iter().next().map(|id| *id)
+    pub fn take_and_visit_unvisited_node(&mut self) -> Option<usize> {
+        while let Some(node_id) = self.next_unvisted.pop_front() {
+            if self.unvisited.remove(&node_id) {
+                return Some(node_id);
+            }
+        }
+        None
     }
 
     pub fn assert_all_visited(&self) {
         assert!(self.unvisited.is_empty());
+        assert!(self.next_unvisted.is_empty());
     }
 }

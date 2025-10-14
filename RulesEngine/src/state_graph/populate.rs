@@ -51,12 +51,10 @@ pub fn populate_node(graph: &mut StateGraph, from_id: usize, shared: &SharedGame
         };
         graph.add_edge(edge);
     }
-
-    graph.mark_visited(from_id);
 }
 
 pub fn populate_step(graph: &mut StateGraph, shared: &SharedGameState) -> PopulateResult {
-    let picked_node = graph.get_unvisited_node();
+    let picked_node = graph.take_and_visit_unvisited_node();
 
     let Some(node_id) = picked_node else {
         graph.assert_all_visited();
