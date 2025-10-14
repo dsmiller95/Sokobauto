@@ -38,6 +38,15 @@ const PUZZLES: &[(&str, &str, usize, SamplingMode)] = &[
 #         ####
 ###########
 "#, 10, SamplingMode::Flat),
+    ("puzzle_5", r#"
+#######
+# $.$.#
+# $.$.#
+# $.$.#
+# $.$.#
+#@    #
+#######
+"#, 10, SamplingMode::Flat),
 ];
 
 pub fn bench_game_solve_full_graph(c: &mut Criterion) {
