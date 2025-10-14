@@ -93,7 +93,7 @@ impl GameTestState {
         let mut result = String::new();
         for y in 0..self.shared.height() {
             for x in 0..self.shared.width() {
-                let pos = IVec2 { y, x };
+                let pos = IVec2 { y: y as i32, x: x as i32 };
                 result.push(get_char(&pos));
             }
             result.push('\n');

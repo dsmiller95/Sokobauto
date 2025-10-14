@@ -16,23 +16,29 @@ impl WonCheckHelper {
 }
 
 impl SharedGameState {
-    pub fn height(&self) -> i32 {
-        self.grid.len() as i32
+    pub fn height(&self) -> i8 {
+        self.grid.len() as i8
     }
 
-    pub fn width(&self) -> i32 {
+    pub fn width(&self) -> i8 {
         if self.grid.is_empty() {
             0
         } else {
-            self.grid[0].len() as i32
+            self.grid[0].len() as i8
+        }
+    }
+
+    pub fn size(&self) -> Vec2 {
+        Vec2 {
+            i: self.height(),
+            j: self.width(),
         }
     }
 
     pub fn bounds(&self) -> BoundsOriginRoot {
-        BoundsOriginRoot::new(
-            self.width(),
-            self.height(),
-        )
+        BoundsOriginRoot{
+            extent: self.size().into()
+        }
     }
 
     pub fn get_won_check_helper(&self) -> WonCheckHelper {
@@ -40,7 +46,7 @@ impl SharedGameState {
         for (i, row) in self.grid.iter().enumerate() {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
-                    target_positions.push(Vec2 { i: i as i32, j: j as i32 });
+                    target_positions.push(Vec2 { i: i as i8, j: j as i8 });
                 }
             }
         }
@@ -54,7 +60,7 @@ impl SharedGameState {
         for (i, row) in self.grid.iter().enumerate() {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
-                    let pos = Vec2 { i: i as i32, j: j as i32 };
+                    let pos = Vec2 { i: i as i8, j: j as i8 };
                     if !game_state.environment.boxes.contains(&pos) {
                         return false;
                     }
@@ -69,7 +75,7 @@ impl SharedGameState {
         for (i, row) in self.grid.iter().enumerate() {
             for (j, &c) in row.iter().enumerate() {
                 if c == Cell::Target {
-                    let pos = Vec2 { i: i as i32, j: j as i32 };
+                    let pos = Vec2 { i: i as i8, j: j as i8 };
                     if boxes.contains(&pos) {
                         count += 1;
                     }
@@ -88,7 +94,7 @@ impl SharedGameState {
     }
 
     pub fn min_reachable_position(&self, game_state: &GameState) -> Vec2 {
-        let mut min_reachable = Vec2 { i: i32::MAX, j: i32::MAX };
+        let mut min_reachable = Vec2 { i: i8::MAX, j: i8::MAX };
         self.visit_all_reachable_position(game_state, |&pos| {
             let pos: Vec2 = pos.into();
             if pos < min_reachable {
@@ -187,13 +193,16 @@ impl Default for Vec2 {
 
 impl From<IVec2> for Vec2 {
     fn from(value: IVec2) -> Self {
-        Vec2 { i: value.y, j: value.x }
+        Vec2 {
+            i: value.y.try_into().expect("must fit in i8"),
+            j: value.x.try_into().expect("must fit in i8"),
+        }
     }
 }
 
 impl From<Vec2> for IVec2 {
     fn from(value: Vec2) -> Self {
-        IVec2 { x: value.j, y: value.i }
+        IVec2 { x: value.j as i32, y: value.i as i32 }
     }
 }
 

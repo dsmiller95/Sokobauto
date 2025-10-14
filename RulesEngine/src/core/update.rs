@@ -16,7 +16,7 @@ pub fn step(
 
     let ni = game.player.i + dir.i;
     let nj = game.player.j + dir.j;
-    let dest_pos = Vec2{
+    let dest_pos = Vec2 {
         i: ni,
         j: nj,
     };

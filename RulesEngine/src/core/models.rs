@@ -5,14 +5,15 @@ pub enum Cell {
     Target,
 }
 
-// TODO: use glam::i32::ivec2 instead 
+// TODO: use glam::i32::ivec2 instead
+// Or, alternatively, use a custom u8 x u8 type. Unlikely any game will be bigger than 255x255
+// when the graph gets large we can see 10s of GB of memory - the algo is memory bound
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[derive(PartialOrd, Ord)]
 pub struct Vec2 {
-    pub i: i32,
-    pub j: i32,
+    pub i: i8,
+    pub j: i8,
 }
-
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Direction {

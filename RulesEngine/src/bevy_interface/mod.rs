@@ -365,7 +365,7 @@ fn visualize_playing_games(
         })
         .collect::<Vec<_>>();
 
-    let grid_size = IVec2::new(source_graph_data.shared.width(), source_graph_data.shared.height());
+    let grid_size: IVec2 = source_graph_data.shared.size().into();
 
     let new_grids = all_games.into_iter()
         .map(|game_state| {
