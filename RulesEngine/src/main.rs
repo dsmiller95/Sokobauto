@@ -41,22 +41,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // #..#   #
     // ########
     //     "#;
-//             let level = r#"
-//  ########
-//  #  ##  ####
-//  # @$   #  ####
-//  # ##$ $   #  #
-//  # ##  #$ $   ###
-//  # #####  #$ $  #
-//  # #   ####  #$ #
-//  # ##     ####  #
-// ## .##       # ##
-// #.  .##      # #
-// #..  .##     # ##
-// ###   .#######  #
-//   #  # .        #
-//   ###############
-// "#;
+            let level = r#"
+ ########
+ #  ##  ####
+ # @$   #  ####
+ # ##$ $   #  #
+ # ##  #$ $   ###
+ # #####  #$ $  #
+ # #   ####  #$ #
+ # ##     ####  #
+## .##       # ##
+#.  .##      # #
+#..  .##     # ##
+###   .#######  #
+  #  # .        #
+  ###############
+"#;
 
     let (game_state, shared) = parse_level(level);
     let mut terminal = setup_terminal()?;
@@ -134,7 +134,7 @@ fn run_state_graph(
     println!("{}", get_graph_info(&state_graph));
 
     // let json_data = get_json_data(&state_graph, shared);
-    // 
+    //
     // std::fs::create_dir_all("exports")?;
     // let mut f = std::fs::OpenOptions::new()
     //     .write(true)

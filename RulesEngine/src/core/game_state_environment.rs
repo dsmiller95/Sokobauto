@@ -6,16 +6,17 @@ use crate::core::models::Vec2;
 
 #[derive(Clone, Debug)]
 pub struct GameStateEnvironment {
-    boxes: [Vec2; 15],
+    boxes: [Vec2; BOX_COUNT],
 }
 
+const BOX_COUNT: usize = 8;
 const EMPTY_BOX: Vec2 = Vec2 { i: i8::MAX, j: i8::MAX };
 
 impl GameStateEnvironment {
     pub fn new(boxes: Vec<IVec2>) -> GameStateEnvironment {
         // TODO: use something like SmallVec to get best of both worlds?
         assert!(boxes.len() <= 15, "boxes length should be less than 15");
-        let mut boxes_fixed = [EMPTY_BOX; 15];
+        let mut boxes_fixed = [EMPTY_BOX; BOX_COUNT];
         for (i, &b) in boxes.iter().enumerate() {
             boxes_fixed[i] = b.into();
         }
@@ -28,7 +29,7 @@ impl GameStateEnvironment {
 
     pub fn new_empty() -> GameStateEnvironment {
         GameStateEnvironment {
-            boxes: [EMPTY_BOX; 15],
+            boxes: [EMPTY_BOX; BOX_COUNT],
         }
     }
 
