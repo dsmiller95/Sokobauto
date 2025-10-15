@@ -220,34 +220,26 @@ impl TileAssets {
     }
 
     pub fn get_ui_bundle_for_tile(&self, tile_type: TileType, alpha: f32) -> impl Bundle {
-        const size: f32 = 16.0;
-        match self.images.get(&tile_type) {
-            Some(image) => {
-                (
-                    Node {
-                        height: Val::Px(size),
-                        width: Val::Px(size),
-                        ..default()
-                    },
-                    ImageNode {
-                        image: image.clone(),
-                        color: Color::srgba(1.0, 1.0, 1.0, alpha),
-                        ..default()
-                    },
-                )
+        const SIZE: f32 = 16.0;
+        let Some(image) = self.images.get(&tile_type) else {
+            panic!("No image loaded for tile type {:?}", tile_type);
+        };
+
+        (
+            Node {
+                height: Val::Px(SIZE),
+                width: Val::Px(SIZE),
+                padding: UiRect::all(Val::Px(5.0)),
+                ..default()
             },
-            None => {
-                let mut tmp_color = bevy::color::palettes::basic::MAROON;
-                tmp_color.alpha = alpha;
-                (
-                    Node {
-                        height: Val::Px(size),
-                        width: Val::Px(size),
-                        ..default()
-                    },
-                    BackgroundColor(tmp_color.into())
-                )
-            },
-        }
+            ImageNode::new(image.clone()),
+        )
+    }
+
+    pub fn get_image_for_tile(&self, tile_type: TileType) -> Handle<Image> {
+        let Some(image) = self.images.get(&tile_type) else {
+            panic!("No image loaded for tile type {:?}", tile_type);
+        };
+        image.clone()
     }
 }
