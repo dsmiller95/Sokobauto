@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // #..#   #
     // ########
     //     "#;
-            let level = r#"
+    let level = r#"
  ########
  #  ##  ####
  # @$   #  ####
@@ -56,6 +56,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ###   .#######  #
   #  # .        #
   ###############
+"#;
+    let level = r#"
+   ######
+####..$@#
+#   #..*#
+#    #* #
+# $#$ ..#
+# $ $ $ #
+#      ##
+########
+"#;
+    let level = r#"
+    #####
+#####@. #
+#   #.**#
+#  $ #..#
+#  #   .#
+# $$$$ *#
+#    #  #
+#########
 "#;
 
     let (game_state, shared) = parse_level(level);
