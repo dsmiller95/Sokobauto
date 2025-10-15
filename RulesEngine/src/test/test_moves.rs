@@ -1,4 +1,5 @@
 ﻿
+#[cfg(test)]
 mod test {
     use std::hint::black_box;
     use Direction::*;

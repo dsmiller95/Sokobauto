@@ -1,4 +1,5 @@
 ﻿
+#[cfg(test)]
 mod test {
     use crate::core::*;
     use crate::state_graph::{get_all_adjacent_nodes, UniqueNode};

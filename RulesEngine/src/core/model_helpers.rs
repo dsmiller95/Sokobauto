@@ -85,6 +85,12 @@ impl SharedGameState {
         }
         count
     }
+    
+    pub fn total_targets(&self) -> usize {
+        self.grid.iter().flat_map(|r| r.iter())
+            .filter(|c| **c == Cell::Target)
+            .count()
+    }
 
     pub fn reachable_positions(&self, game_state: &GameState) -> Vec<Vec2> {
         let mut reachable = Vec::<Vec2>::new();
