@@ -1,13 +1,24 @@
-use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState};
+use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState, is_winnable, WinnableState};
 use crate::state_graph::Edge;
 use crate::state_graph::models::{PopulateResult, StateGraph};
 use crate::state_graph::unique_node::UniqueNode;
 
 pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) -> Vec<UniqueNode> {
-    let reachable_positions = shared.reachable_positions_visitation(&GameState {
+    let from_state = GameState {
         player: from_node.minimum_reachable_player_position.into(),
         environment: from_node.environment.clone(),
-    });
+    };
+    let can_win = is_winnable(shared, &from_state);
+    
+    match can_win {
+        WinnableState::WinMaybePossible => {}
+        WinnableState::WinImpossible => {
+            // if we cannot win from this state, then we abort. pretend this node has no adjacent nodes.
+            return vec![];
+        }
+    }
+
+    let reachable_positions = shared.reachable_positions_visitation(&from_state);
     let actions = from_node.environment.iter_boxes()
         .flat_map(UserAction::all_push_actions_around)
         .filter(|(box_pos, _)| reachable_positions.get(&(*box_pos).into())
