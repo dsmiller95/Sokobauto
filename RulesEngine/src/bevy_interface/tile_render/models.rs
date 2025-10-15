@@ -29,10 +29,18 @@ pub enum TileType {
 }
 
 #[derive(Component)]
+pub struct TileGrid;
+
+
+#[derive(Component)]
 pub struct TileSlot {
     pub location: IVec2,
     pub depth: usize,
     pub tile_type: TileType,
+}
+
+pub struct TileUiBundle {
+    
 }
 
 const ALL_TILE_TYPES: &[TileType] = &[
@@ -207,6 +215,38 @@ impl TileAssets {
                 let mut tmp_color = bevy::color::palettes::basic::MAROON;
                 tmp_color.alpha = alpha;
                 Sprite::from_color(tmp_color, Vec2::splat(1.0))
+            },
+        }
+    }
+
+    pub fn get_ui_bundle_for_tile(&self, tile_type: TileType, alpha: f32) -> impl Bundle {
+        const size: f32 = 16.0;
+        match self.images.get(&tile_type) {
+            Some(image) => {
+                (
+                    Node {
+                        height: Val::Px(size),
+                        width: Val::Px(size),
+                        ..default()
+                    },
+                    ImageNode {
+                        image: image.clone(),
+                        color: Color::srgba(1.0, 1.0, 1.0, alpha),
+                        ..default()
+                    },
+                )
+            },
+            None => {
+                let mut tmp_color = bevy::color::palettes::basic::MAROON;
+                tmp_color.alpha = alpha;
+                (
+                    Node {
+                        height: Val::Px(size),
+                        width: Val::Px(size),
+                        ..default()
+                    },
+                    BackgroundColor(tmp_color.into())
+                )
             },
         }
     }
