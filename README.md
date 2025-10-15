@@ -16,7 +16,6 @@ Install prerequisites:
 Run setup:
 ```bash
 cd graph-view
-npm install
 ```
 ```bash
 cd RulesEngine
