@@ -34,13 +34,13 @@ pub struct TileGrid;
 
 #[derive(Component)]
 pub struct TileSlot {
-    pub location: IVec2,
-    pub depth: usize,
+    pub tile_location: TileLocation,
     pub tile_type: TileType,
 }
 
-pub struct TileUiBundle {
-    
+pub struct TileLocation {
+    pub location: IVec2,
+    pub depth: usize,
 }
 
 const ALL_TILE_TYPES: &[TileType] = &[
@@ -158,7 +158,7 @@ impl Tiles {
         )
     }
 
-    pub fn get_tile_at(&self, slot: &TileSlot) -> TileType {
+    pub fn get_tile_at(&self, slot: &TileLocation) -> TileType {
         self.grids.get(slot.depth)
             .and_then(|grid| grid.get(slot.location.y as usize))
             .and_then(|v| v.get(slot.location.x as usize))
@@ -166,7 +166,7 @@ impl Tiles {
             .unwrap_or(TileType::Empty)
     }
 
-    pub fn get_tile_world_position(&self, slot: &TileSlot) -> Vec3 {
+    pub fn get_tile_world_position(&self, slot: &TileLocation) -> Vec3 {
         (slot.location.as_vec2() * self.cell_size).extend(slot.depth as f32 * 0.1) + self.root
     }
 
@@ -219,7 +219,7 @@ impl TileAssets {
         }
     }
 
-    pub fn get_ui_bundle_for_tile(&self, tile_type: TileType, alpha: f32) -> impl Bundle {
+    pub fn get_ui_bundle_for_tile(&self, tile_type: TileType) -> impl Bundle {
         const SIZE: f32 = 16.0;
         let Some(image) = self.images.get(&tile_type) else {
             panic!("No image loaded for tile type {:?}", tile_type);

@@ -1,5 +1,5 @@
 ﻿use bevy::prelude::*;
-use crate::bevy_interface::tile_render::models::{TileAssets, TileGrid, TileSlot, Tiles};
+use crate::bevy_interface::tile_render::models::{TileAssets, TileGrid, TileLocation, TileSlot, Tiles};
 
 pub fn setup_tile_render(
     mut commands: Commands,
@@ -17,21 +17,27 @@ pub fn setup_tile_render(
             right: Val::Px(10.0),
             width: Val::Auto,
             height: Val::Auto,
-            padding: UiRect::all(Val::Px(15.0)),
-            display: Display::Grid,
-            grid_auto_columns: GridTrack::auto(),
-            grid_auto_rows: GridTrack::auto(),
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::WrapReverse,
+            justify_content: JustifyContent::End,
+            padding: UiRect::all(Val::Px(10.0)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
+        BackgroundColor(bevy::color::palettes::basic::BLACK.with_alpha(0.4).into()),
         BorderRadius::all(Val::Px(4.0)),
         TileGrid
     ));
 }
 
+
+#[derive(Component)]
+pub struct EphemeralTileUiNode;
+
 pub fn update_grid_size(
     mut commands: Commands,
     existing_tiles: Query<Entity, With<TileSlot>>,
+    other_ephemerals: Query<Entity, With<EphemeralTileUiNode>>,
     parent_grid: Query<Entity, With<TileGrid>>,
     mut tiles: ResMut<Tiles>,
     tile_assets: Res<TileAssets>,
@@ -56,38 +62,46 @@ pub fn update_grid_size(
     for entity in existing_tiles.iter() {
         commands.entity(entity).despawn();
     }
+    for entity in other_ephemerals.iter() {
+        commands.entity(entity).despawn();
+    }
 
     let total_tiles = tiles.get_tile_count();
-    let alpha = 1.0 / (total_tiles as f32);
-
     commands.entity(parent_grid).with_children(|parent| {
         // respawn
-        for x in 0..new_size.x {
-            for y in 0..new_size.y {
-                let location = IVec2 { x, y };
-                let mut spawned = parent.spawn((
-                    Node {
-                        grid_row: GridPlacement::start((new_size.y - y) as i16),
-                        grid_column: GridPlacement::start(x as i16 + 1),
-                        width: Val::Px(32.0),
-                        height: Val::Px(32.0),
-                        flex_direction: FlexDirection::Column,
-                        align_items: AlignItems::Center,
-                        flex_wrap: FlexWrap::Wrap,
-                        ..default()
-                    },
-                    BackgroundColor(bevy::color::palettes::basic::MAROON.into()),
-                ));
+        for depth in 0..total_tiles {
+            let mut spawned = parent.spawn((
+                Node {
+                    display: Display::Grid,
+                    grid_auto_columns: GridTrack::auto(),
+                    grid_auto_rows: GridTrack::auto(),
+                    padding: UiRect::all(Val::Px(5.0)),
+                    ..default()
+                },
+                EphemeralTileUiNode
+            ));
 
-                for (depth, tile_type) in tiles.get_tiles_at(&location).enumerate() {
-                    let slot = TileSlot {
-                        tile_type,
+            for x in 0..new_size.x {
+                for y in 0..new_size.y {
+                    let tile_location = TileLocation{
+                        location: IVec2 { x, y },
                         depth,
-                        location,
                     };
-                    let bundle = tile_assets.get_ui_bundle_for_tile(tile_type, alpha);
+                    let tile_type = tiles.get_tile_at(&tile_location);
+                    let slot = TileSlot {
+                        tile_location,
+                        tile_type,
+                    };
+                    let image = tile_assets.get_image_for_tile(tile_type);
                     spawned.with_child((
-                        bundle,
+                        Node {
+                            grid_row: GridPlacement::start((new_size.y - y) as i16),
+                            grid_column: GridPlacement::start(x as i16 + 1),
+                            width: Val::Px(32.0),
+                            height: Val::Px(32.0),
+                            ..default()
+                        },
+                        ImageNode::new(image.clone()),
                         slot,
                     ));
                 }
@@ -112,7 +126,7 @@ pub fn update_grid(
     // let alpha = 1.0 / (total_tiles as f32);
 
     for (mut tile_slot, mut image) in existing_tiles.iter_mut() {
-        let tile_type = tiles.get_tile_at(&tile_slot);
+        let tile_type = tiles.get_tile_at(&tile_slot.tile_location);
 
         if tile_type == tile_slot.tile_type { continue; }
         tile_slot.tile_type = tile_type;
