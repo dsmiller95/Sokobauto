@@ -100,14 +100,14 @@ fn process_game_input(
                 let Some(new_game_id) = new_game_id else {
                     // if the game does not exist in the graph, we abort the move. the game will remain.
                     println!("Action would end game. Aborting for game {:}", node.id);
-                    return;
+                    continue;
                 };
                 
                 commands.entity(entity).remove::<PlayingGameState>();
 
                 let Some(&entity) = graph_entity_lookup.get_entity(new_game_id) else {
                     eprintln!("Could not find game entity for game ID {:?}", new_game_id);
-                    return;
+                    continue;
                 };
 
                 commands.entity(entity).insert(new_playing);

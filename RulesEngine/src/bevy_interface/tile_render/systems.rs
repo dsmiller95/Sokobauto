@@ -69,10 +69,11 @@ pub fn update_grid_size(
                     Node {
                         grid_row: GridPlacement::start((new_size.y - y) as i16),
                         grid_column: GridPlacement::start(x as i16 + 1),
-                        // width: percent(100),
-                        // height: percent(100),
+                        width: Val::Px(32.0),
+                        height: Val::Px(32.0),
                         flex_direction: FlexDirection::Column,
                         align_items: AlignItems::Center,
+                        flex_wrap: FlexWrap::Wrap,
                         ..default()
                     },
                     BackgroundColor(bevy::color::palettes::basic::MAROON.into()),
