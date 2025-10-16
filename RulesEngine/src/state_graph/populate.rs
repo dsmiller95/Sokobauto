@@ -1,4 +1,4 @@
-use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState, is_winnable, WinnableState};
+use crate::core::{GameUpdate, UserAction, step, SharedGameState, GameState, is_winnable, WinnableState, TRIM_HEURISTICAL_UNWINNABLE};
 use crate::state_graph::Edge;
 use crate::state_graph::models::{PopulateResult, StateGraph};
 use crate::state_graph::unique_node::UniqueNode;
@@ -8,13 +8,16 @@ pub fn get_all_adjacent_nodes(from_node: &UniqueNode, shared: &SharedGameState) 
         player: from_node.minimum_reachable_player_position.into(),
         environment: from_node.environment.clone(),
     };
-    let can_win = is_winnable(shared, &from_state);
-    
-    match can_win {
-        WinnableState::WinMaybePossible => {}
-        WinnableState::WinImpossible => {
-            // if we cannot win from this state, then we abort. pretend this node has no adjacent nodes.
-            return vec![];
+
+     if TRIM_HEURISTICAL_UNWINNABLE {
+        let can_win = is_winnable(shared, &from_state);
+
+        match can_win {
+            WinnableState::WinMaybePossible => {}
+            WinnableState::WinImpossible => {
+                // if we cannot win from this state, then we abort. pretend this node has no adjacent nodes.
+                return vec![];
+            }
         }
     }
 

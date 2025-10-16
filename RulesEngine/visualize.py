@@ -17,6 +17,7 @@ def load_data(filepath: str):
                 records.append(parsed)
     if not records:
         raise ValueError("No valid lines found in log file.")
+    # records = records[25:]
     df = pd.DataFrame(records, columns=["nodes", "edges", "visited"])
     df["unvisited"] = df["nodes"] - df["visited"]
     df["visited_percent"] = df["visited"] / df["nodes"] * 100

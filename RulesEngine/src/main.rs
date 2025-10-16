@@ -13,7 +13,7 @@ use crate::console_interface::ConsoleInput::*;
 use crate::console_interface::{
     cleanup_terminal, handle_input, parse_level, render_game, setup_terminal,
 };
-use crate::core::{step, GameState, GameUpdate, SharedGameState};
+use crate::core::{step, GameState, GameUpdate, SharedGameState, TRIM_UNWINNABLE};
 use crate::models::GameRenderState;
 use crate::state_graph::{get_graph_info, get_json_data, populate_step, render_graph, trim_unwinnable, GraphRenderState, PopulateResult, StateGraph, UniqueNode};
 use ratatui::Terminal;
@@ -152,12 +152,15 @@ fn run_state_graph(
     cleanup_terminal()?;
 
     println!("{}", get_graph_info(&state_graph));
-    let trimmed_stats = trim_unwinnable(&mut state_graph, shared);
-    println!("Trimmed to only winnable states: {:?}", trimmed_stats  );
-    println!("Trimmed {} ({:.1}%) nodes  and {} ({:.1}%) edges",
-             trimmed_stats.nodes_removed(), trimmed_stats.nodes_removed_percentage(),
-             trimmed_stats.edges_removed(), trimmed_stats.edges_removed_percentage());
-    println!("{}", get_graph_info(&state_graph));
+    if TRIM_UNWINNABLE {
+        let trimmed_stats = trim_unwinnable(&mut state_graph, shared);
+        println!("Trimmed to only winnable states: {:?}", trimmed_stats  );
+        println!("Trimmed {} ({:.1}%) nodes  and {} ({:.1}%) edges",
+                 trimmed_stats.nodes_removed(), trimmed_stats.nodes_removed_percentage(),
+                 trimmed_stats.edges_removed(), trimmed_stats.edges_removed_percentage());
+        println!("{}", get_graph_info(&state_graph));
+    }
+
 
     // let json_data = get_json_data(&state_graph, shared);
     //
