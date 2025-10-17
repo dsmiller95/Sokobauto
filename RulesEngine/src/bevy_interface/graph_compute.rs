@@ -181,7 +181,7 @@ pub fn apply_forces_and_update_octree(
         return;
     }
 
-    let dt = time.delta_secs();
+    let dt = user_config.get_timestep_secs(&time);
     let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
         .map(|(transform, node)| (node.id, transform.translation))
         .collect();

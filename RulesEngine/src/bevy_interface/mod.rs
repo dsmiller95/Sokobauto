@@ -95,6 +95,7 @@ struct UserConfig {
     force_simulation_enabled: bool,
     disable_rendering: bool,
     node_size_multiplier: f32,
+    fixed_timestep: Option<f32>,
 }
 
 #[derive(Resource)]
@@ -104,6 +105,12 @@ struct GraphVisualizationAssets {
 }
 
 impl UserConfig {
+    fn get_timestep_secs(&self, time: &Time) -> f32 {
+        match self.fixed_timestep {
+            Some(fixed_timestep) => fixed_timestep,
+            None => time.delta_secs(),
+        }
+    }
     fn is_simulation_disabled(&self, time: &Time) -> bool {
         !self.force_simulation_enabled && time.elapsed().as_secs_f32() > 10.0
     }
@@ -131,6 +138,7 @@ pub fn visualize_graph(
         force_simulation_enabled: false,
         disable_rendering: false,
         node_size_multiplier: 1.0,
+        fixed_timestep: None,
     };
 
     let mut app = App::new();

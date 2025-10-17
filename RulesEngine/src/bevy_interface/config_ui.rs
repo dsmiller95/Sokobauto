@@ -14,6 +14,7 @@ pub enum ToggleType {
     LeafOnly,
     ForceSimulate,
     DisableRendering,
+    FixedTimestepEnabled,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +24,7 @@ pub enum SliderType {
     AttractionStrength,
     Damping,
     OctreeTheta,
+    FixedTimestep,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +70,7 @@ impl ToggleType {
             ToggleType::LeafOnly,
             ToggleType::ForceSimulate,
             ToggleType::DisableRendering,
+            ToggleType::FixedTimestepEnabled,
         ]
     }
     
@@ -78,6 +81,7 @@ impl ToggleType {
             ToggleType::LeafOnly => "Show Leaf Only",
             ToggleType::ForceSimulate => "Force Simulation On",
             ToggleType::DisableRendering => "Disable Rendering",
+            ToggleType::FixedTimestepEnabled => "Fixed Timestep?",
         }
     }
 
@@ -88,6 +92,7 @@ impl ToggleType {
             ToggleType::LeafOnly => config.show_leaf_only,
             ToggleType::ForceSimulate => user_config.force_simulation_enabled,
             ToggleType::DisableRendering => user_config.disable_rendering,
+            ToggleType::FixedTimestepEnabled => user_config.fixed_timestep.is_some(),
         }
     }
 
@@ -98,6 +103,7 @@ impl ToggleType {
             ToggleType::LeafOnly => config.show_leaf_only = value,
             ToggleType::ForceSimulate => user_config.force_simulation_enabled = value,
             ToggleType::DisableRendering => user_config.disable_rendering = value,
+            ToggleType::FixedTimestepEnabled => user_config.fixed_timestep = if value { Some(0.25) } else { None },
         }
     }
 
@@ -115,6 +121,7 @@ impl SliderType {
             SliderType::AttractionStrength,
             SliderType::Damping,
             SliderType::OctreeTheta,
+            SliderType::FixedTimestep,
         ]
     }
 
@@ -125,6 +132,7 @@ impl SliderType {
             SliderType::AttractionStrength => "Attraction Str",
             SliderType::Damping => "Damping",
             SliderType::OctreeTheta => "Octree Theta",
+            SliderType::FixedTimestep => "Timestep",
         }
     }
 
@@ -135,6 +143,7 @@ impl SliderType {
             SliderType::AttractionStrength => physics_config.attraction_strength,
             SliderType::Damping => physics_config.damping,
             SliderType::OctreeTheta => physics_config.octree_theta,
+            SliderType::FixedTimestep => user_config.fixed_timestep.unwrap_or(0.0),
         }
     }
 
@@ -145,6 +154,7 @@ impl SliderType {
             SliderType::AttractionStrength => physics_config.attraction_strength = value,
             SliderType::Damping => physics_config.damping = value,
             SliderType::OctreeTheta => physics_config.octree_theta = value,
+            SliderType::FixedTimestep => user_config.fixed_timestep = Some(value),
         }
     }
 
@@ -155,6 +165,7 @@ impl SliderType {
             SliderType::AttractionStrength => (0.1, 10.0),
             SliderType::Damping => (0.1, 1.0),
             SliderType::OctreeTheta => (0.2, 1.0),
+            SliderType::FixedTimestep => (0.01, 0.5),
         }
     }
 }
