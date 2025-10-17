@@ -25,12 +25,26 @@ use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interac
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
-use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphData, NodeIdToIndex};
+use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphComputeCache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
 use crate::bevy_interface::selected_game_navigation::{PlayingGameState, SelectedGameNavigationPlugin};
 use crate::bevy_interface::tile_render::{TileRenderPlugin, TileType, Tiles};
 
 const RENDER_NODES: bool = black_box(true);
+
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+enum GraphNodeSpawnSystemSet {
+    EntitiesSpawned,
+    ComputeCacheSetup
+}
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StartupSystemSet {
+    General,
+    AfterGraphNodesSpawned,
+    AfterGraphComputeCache,
+}
 
 #[derive(Component)]
 struct GraphNode {
@@ -48,6 +62,7 @@ struct NodePositions {
 struct SourceGraphData {
     graph: StateGraph,
     shared: SharedGameState,
+    initial_node_id: usize,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -101,10 +116,14 @@ impl UserConfig {
     }
 }
 
-pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
+pub fn visualize_graph(
+    initial_node_id: usize,
+    graph: &StateGraph,
+    shared: &SharedGameState) {
     let source_data = SourceGraphData {
         graph: graph.clone(),
         shared: shared.clone(),
+        initial_node_id
     };
 
     let graph_data = GraphData::from_state_graph(graph, shared);
@@ -152,7 +171,32 @@ pub fn visualize_graph(graph: &StateGraph, shared: &SharedGameState) {
             octree_max_points_per_leaf: 16, // Reasonable leaf size
             octree_min_points_per_node: 8, // Prevent excessive subdivision
         })
-        .add_systems(Startup, (setup_scene, setup_shared_meshes, setup_graph_from_data, setup_octree_resource, setup_compute_cache, setup_fps_counter, setup_octree_visualization, setup_config_panel).chain())
+        .configure_sets(Startup, (
+            StartupSystemSet::AfterGraphNodesSpawned
+                .after(GraphNodeSpawnSystemSet::EntitiesSpawned),
+            StartupSystemSet::AfterGraphComputeCache
+                .after(GraphNodeSpawnSystemSet::ComputeCacheSetup),
+        ))
+        .add_systems(Startup, (
+            (
+                setup_scene,
+                setup_fps_counter,
+                setup_config_panel,
+                setup_octree_visualization,
+                (
+                    setup_shared_meshes,
+                    setup_graph_from_data,
+                ).chain()
+                    .in_set(GraphNodeSpawnSystemSet::EntitiesSpawned),
+            ).in_set(StartupSystemSet::General),
+            (
+                setup_octree_resource,
+                setup_compute_cache
+                    .in_set(GraphNodeSpawnSystemSet::ComputeCacheSetup),
+            ).in_set(StartupSystemSet::AfterGraphNodesSpawned),
+            select_initial_node
+                .in_set(StartupSystemSet::AfterGraphComputeCache),
+        ))
         .add_systems(Update, (
             apply_forces_and_update_octree, update_octree_visualization,
             update_fps_counter,
@@ -448,6 +492,21 @@ fn on_space_pressed_clear_playing_nodes(
     }
 }
 
+
+fn select_initial_node(
+    mut commands: Commands,
+    graph_data: Res<SourceGraphData>,
+    entity_lookup: Res<GraphComputeCache>,
+) {
+    let initial_id = graph_data.initial_node_id;
+    let Some(&node_entity) = entity_lookup.get_entity(&initial_id) else {
+        eprintln!("Failed to find initial node entity");
+        return;
+    };
+
+    select_node(&mut commands, graph_data, &initial_id, node_entity)
+}
+
 fn on_space_pressed_start_playing_random_node(
     mut commands: Commands,
     unplaying_nodes: Query<(Entity, &GraphNode), Without<PlayingGameState>>,
@@ -474,7 +533,6 @@ fn on_node_clicked_toggle_playing_game(
 ) {
     let clicked_entity = clicked.entity;
     let Ok((clicked_node, playing_game_state)) = graph_nodes.get(clicked_entity) else {
-        eprintln!("Clicked on a non-node!");
         return;
     };
 
@@ -484,12 +542,11 @@ fn on_node_clicked_toggle_playing_game(
             commands.entity(clicked_entity).remove::<PlayingGameState>();
         }
         None => {
-            println!("Selecting {}", clicked_node.id);
-            let unique_node = graph_data.graph.nodes.get_by_right(&clicked_node.id).expect("node id not found");
-            commands.entity(clicked_entity).insert(PlayingGameState::new_playing_state(unique_node));
+            select_node(&mut commands, graph_data, &clicked_node.id, clicked_entity);
         }
     }
 }
+
 
 fn select_random_adjacent_node_when_space_bar_pressed(
     mut commands: Commands,
@@ -546,4 +603,11 @@ fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {
     };
     
     Color::srgb(1.0 - t, 0.0, t)
+}
+
+
+fn select_node(commands: &mut Commands, graph_data: Res<SourceGraphData>, node_id: &usize, node_entity: Entity) {
+    println!("Selecting {}", node_id);
+    let unique_node = graph_data.graph.nodes.get_by_right(&node_id).expect("node id not found");
+    commands.entity(node_entity).insert(PlayingGameState::new_playing_state(unique_node));
 }
