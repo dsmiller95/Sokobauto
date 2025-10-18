@@ -15,7 +15,7 @@ use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use crate::state_graph::StateGraph;
 use crate::core::{Cell, SharedGameState};
 use rand::Rng;
-use std::collections::{HashMap};
+use std::collections::{HashMap, HashSet};
 use std::hint::black_box;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin};
 use bevy::input::keyboard::{Key};
@@ -25,7 +25,7 @@ use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interac
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
-use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphComputeCache, GraphData, NodeIdToIndex};
+use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, AllEdgeIndexes, GraphComputeCache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, RecentlySelectedNode, SelectedNode};
 use crate::bevy_interface::selected_game_navigation::{PlayingGameState, SelectedGameNavigationPlugin};
 use crate::bevy_interface::tile_render::{TileRenderPlugin, TileType, Tiles};
@@ -375,9 +375,10 @@ fn setup_graph_from_data(
 
     let mut edge_data = EdgeRenderData::new();
     edge_data.update_vertices(vertices);
-    edge_data.update_edges(edges);
+    edge_data.update_edges(edges.clone());
     commands.insert_resource(edge_data);
     commands.insert_resource(NodeIdToIndex::new(id_to_index));
+    commands.insert_resource(AllEdgeIndexes::new(edges));
 
     commands.insert_resource(NodePositions { positions: node_positions });
 }
@@ -402,17 +403,37 @@ fn setup_octree_resource(
 fn update_shader_edge_data(
     node_positions: Res<NodePositions>,
     node_id_to_index: Res<NodeIdToIndex>,
+    compute_cache: Res<GraphComputeCache>,
+    all_edges: Res<AllEdgeIndexes>,
     mut edge_data: ResMut<EdgeRenderData>,
     time: Res<Time>,
     user_config: Res<UserConfig>,
+    visibility_query: Query<(&GraphNode, &Visibility)>,
 ) {
-    if user_config.is_rendering_disabled() || user_config.is_simulation_disabled(&time) {
+    if user_config.is_rendering_disabled() {
         return;
     }
 
+    let visible_indexes: HashSet<u32> = visibility_query.iter().filter_map(|(node, visibility)| {
+        if visibility == Visibility::Visible {
+            node_id_to_index.get_index(&node.id).map(|&x| x as u32)
+        } else {
+            None
+        }
+    }).collect();
+
     let vertices = node_id_to_index.get_indexed_vertex_positions(node_positions.as_ref());
-    
+
     edge_data.update_vertices(vertices);
+
+    let edges = all_edges.iter_edges()
+        .filter(|edge| {
+            visible_indexes.contains(&edge[0]) || visible_indexes.contains(&edge[1])
+        })
+        .copied()
+        .collect::<Vec<_>>();
+
+    edge_data.update_edges(edges);
 }
 
 fn visualize_playing_games(

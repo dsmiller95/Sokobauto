@@ -10,6 +10,9 @@ use crate::state_graph::StateGraph;
 #[derive(Resource)]
 pub struct NodeIdToIndex(HashMap<usize, usize>);
 
+#[derive(Resource)]
+pub struct AllEdgeIndexes(Vec<[u32; 2]>);
+
 // Resource to hold graph data
 #[derive(Resource)]
 pub struct GraphData {
@@ -35,6 +38,16 @@ pub struct GraphComputeCache {
     neighbor_map: HashMap<usize, Vec<usize>>,
     // map of node IDs to their Entity
     entity_map: HashMap<usize, Entity>,
+}
+
+impl AllEdgeIndexes {
+    pub fn new(index_data: Vec<[u32; 2]>) -> Self {
+        AllEdgeIndexes(index_data)
+    }
+
+    pub fn iter_edges(&self) -> impl Iterator<Item=&[u32; 2]> {
+        self.0.iter()
+    }
 }
 
 impl GraphData {
@@ -111,6 +124,10 @@ impl NodeIdToIndex {
             }
         }
         vertices
+    }
+
+    pub fn get_index(&self, node_id: &usize) -> Option<&usize> {
+        self.0.get(node_id)
     }
 }
 
