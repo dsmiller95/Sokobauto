@@ -15,6 +15,7 @@ pub enum ToggleType {
     ForceSimulate,
     DisableRendering,
     FixedTimestepEnabled,
+    HideNeverSelected,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +72,7 @@ impl ToggleType {
             ToggleType::ForceSimulate,
             ToggleType::DisableRendering,
             ToggleType::FixedTimestepEnabled,
+            ToggleType::HideNeverSelected,
         ]
     }
     
@@ -82,6 +84,7 @@ impl ToggleType {
             ToggleType::ForceSimulate => "Force Simulation On",
             ToggleType::DisableRendering => "Disable Rendering",
             ToggleType::FixedTimestepEnabled => "Fixed Timestep?",
+            ToggleType::HideNeverSelected => "Hide Unselected?",
         }
     }
 
@@ -93,6 +96,7 @@ impl ToggleType {
             ToggleType::ForceSimulate => user_config.force_simulation_enabled,
             ToggleType::DisableRendering => user_config.disable_rendering,
             ToggleType::FixedTimestepEnabled => user_config.fixed_timestep.is_some(),
+            ToggleType::HideNeverSelected => user_config.hide_never_selected,
         }
     }
 
@@ -104,6 +108,7 @@ impl ToggleType {
             ToggleType::ForceSimulate => user_config.force_simulation_enabled = value,
             ToggleType::DisableRendering => user_config.disable_rendering = value,
             ToggleType::FixedTimestepEnabled => user_config.fixed_timestep = if value { Some(0.25) } else { None },
+            ToggleType::HideNeverSelected => user_config.hide_never_selected = value,
         }
     }
 

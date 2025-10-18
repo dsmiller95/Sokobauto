@@ -4,6 +4,11 @@ use crate::bevy_interface::{GraphNode, GraphVisualizationAssets};
 #[derive(Component)]
 pub struct SelectedNode;
 
+#[derive(Component, Default)]
+pub struct RecentlySelectedNode {
+    selection_tier: u8,
+}
+
 #[derive(Resource)]
 struct SelectionVisualizationAssets {
     selected_node_material: Handle<StandardMaterial>,
@@ -15,7 +20,7 @@ impl Plugin for NodeSelectionPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(Startup, setup_shared_meshes)
-            .add_systems(Update, (set_selected_material_when_selected, set_unselected_material_when_unselected))
+            .add_systems(Update, (set_selected_material_when_selected, when_unselected_handler))
         ;
     }
 }
@@ -44,12 +49,15 @@ fn set_selected_material_when_selected(
     }
 }
 
-fn set_unselected_material_when_unselected(
+fn when_unselected_handler(
+    mut commands: Commands,
     external_visualization_assets: Res<GraphVisualizationAssets>,
     mut node_materials: Query<(&GraphNode, &mut MeshMaterial3d<StandardMaterial>)>,
     mut removed: RemovedComponents<SelectedNode>,
 ) {
     removed.read().for_each(|entity| {
+        commands.entity(entity).insert(RecentlySelectedNode::default());
+
         let Ok((node, mut material)) = node_materials.get_mut(entity) else {
             return;
         };

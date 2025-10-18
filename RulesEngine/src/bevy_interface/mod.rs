@@ -26,7 +26,7 @@ use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
 use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, GraphComputeCache, GraphData, NodeIdToIndex};
-use crate::bevy_interface::node_selection::{NodeSelectionPlugin, SelectedNode};
+use crate::bevy_interface::node_selection::{NodeSelectionPlugin, RecentlySelectedNode, SelectedNode};
 use crate::bevy_interface::selected_game_navigation::{PlayingGameState, SelectedGameNavigationPlugin};
 use crate::bevy_interface::tile_render::{TileRenderPlugin, TileType, Tiles};
 
@@ -96,6 +96,7 @@ struct UserConfig {
     disable_rendering: bool,
     node_size_multiplier: f32,
     fixed_timestep: Option<f32>,
+    hide_never_selected: bool,
 }
 
 #[derive(Resource)]
@@ -139,6 +140,7 @@ pub fn visualize_graph(
         disable_rendering: false,
         node_size_multiplier: 1.0,
         fixed_timestep: None,
+        hide_never_selected: false,
     };
 
     let mut app = App::new();
@@ -214,6 +216,7 @@ pub fn visualize_graph(
             select_nodes_with_playing_games,
             visualize_playing_games,
             focus_newly_selected_nodes,
+            display_only_recently_selected_nodes,
         )).add_observer(on_node_clicked_toggle_playing_game);
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
@@ -269,6 +272,22 @@ fn on_config_changed(
             *node_mesh = Sphere::new(mesh_size).mesh().ico(0).unwrap();
         }
         _ => {}
+    }
+}
+
+fn display_only_recently_selected_nodes(
+    user_config: Res<UserConfig>,
+    mut node_selection_visibility_query: Query<(&mut Visibility, Option<&SelectedNode>, Option<&RecentlySelectedNode>), With<GraphNode>>,
+) {
+    for (mut visibility, selected, recently_selected) in node_selection_visibility_query.iter_mut() {
+        let visible = if !user_config.hide_never_selected {
+            Visibility::Visible
+        } else if selected.is_some() || recently_selected.is_some() {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        *visibility = visible;
     }
 }
 
@@ -330,6 +349,7 @@ fn setup_graph_from_data(
             entity.insert((
                 Mesh3d(graph_assets.node_mesh.clone()),
                 MeshMaterial3d(graph_assets.node_materials[node_data.on_targets].clone()),
+                Visibility::Visible,
             ));
         }
 
@@ -545,7 +565,7 @@ fn on_node_clicked_toggle_playing_game(
     };
 
     match playing_game_state {
-        Some(graph_node) => {
+        Some(_) => {
             println!("Deselecting {}", clicked_node.id);
             commands.entity(clicked_entity).remove::<PlayingGameState>();
         }
