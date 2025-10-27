@@ -428,7 +428,7 @@ fn update_shader_edge_data(
 
     let edges = all_edges.iter_edges()
         .filter(|edge| {
-            visible_indexes.contains(&edge[0]) || visible_indexes.contains(&edge[1])
+            visible_indexes.contains(&edge[0]) && visible_indexes.contains(&edge[1])
         })
         .copied()
         .collect::<Vec<_>>();
