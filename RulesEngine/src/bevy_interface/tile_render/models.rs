@@ -104,6 +104,8 @@ impl Tiles {
     pub fn assign_new_grids(&mut self, new_grids: Vec<Vec<Vec<TileType>>>) {
         if new_grids.is_empty() {
             self.grids = new_grids;
+            self.tile_contents_dirty = true;
+            self.grid_size = self.grid_size.with_z(0);
             return;
         }
 

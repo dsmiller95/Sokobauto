@@ -96,6 +96,9 @@ struct UserConfig {
     node_size_multiplier: f32,
     fixed_timestep: Option<f32>,
     hide_never_selected: bool,
+    max_viewed_games: f32,
+    random_selects_per_second: f32,
+    focus_selected: bool,
 }
 
 #[derive(Resource)]
@@ -121,6 +124,9 @@ impl UserConfig {
     fn is_rendering_disabled(&self) -> bool {
         self.disable_rendering
     }
+    fn get_total_to_select(&self, time: &Time) -> usize {
+        (self.random_selects_per_second * time.delta_secs()).ceil() as usize
+    }
 }
 
 pub fn visualize_graph(
@@ -140,6 +146,9 @@ pub fn visualize_graph(
         node_size_multiplier: 1.0,
         fixed_timestep: None,
         hide_never_selected: false,
+        max_viewed_games: 4.,
+        random_selects_per_second: 1000.0,
+        focus_selected: true,
     };
 
     let mut app = App::new();
@@ -211,10 +220,11 @@ pub fn visualize_graph(
             update_fps_counter,
             handle_toggle_interactions))
         .add_systems(Update, (
-            on_space_pressed_clear_playing_nodes, // select_random_adjacent_node_when_space_bar_pressed,
+            // on_space_pressed_clear_playing_nodes,
+            on_b_pressed_select_random_adjacent_node,
             select_nodes_with_playing_games,
             visualize_playing_games,
-            focus_newly_selected_nodes,
+            focus_all_selected_nodes, // focus_newly_selected_nodes,
             display_only_recently_selected_nodes,
         )).add_observer(on_node_clicked_toggle_playing_game);
 
@@ -334,7 +344,7 @@ fn setup_graph_from_data(
             rng.random_range(-15.0..15.0),
             rng.random_range(-15.0..15.0),
         );
-        
+
         let mut entity = commands.spawn((
             Transform::from_translation(position),
             GraphNode {
@@ -439,6 +449,7 @@ fn visualize_playing_games(
     any_changed: Query<Entity, Changed<PlayingGameState>>,
     all_playing: Query<(&GraphNode, &PlayingGameState)>,
     source_graph_data: Res<SourceGraphData>,
+    user_config: Res<UserConfig>,
     mut tiles: ResMut<Tiles>,
 ){
     if any_changed.is_empty() {
@@ -455,6 +466,7 @@ fn visualize_playing_games(
             let game_state = playing_game_state.apply_to_node(selected_game_state.clone());
             Some(game_state)
         })
+        .take(user_config.max_viewed_games as usize)
         .collect::<Vec<_>>();
 
     let grid_size: IVec2 = source_graph_data.shared.size().into();
@@ -513,6 +525,27 @@ fn focus_newly_selected_nodes(
     }
 }
 
+fn focus_all_selected_nodes(
+    selected_nodes: Query<&Transform, With<SelectedNode>>,
+    user_config: Res<UserConfig>,
+    mut orbit_cameras: Query<&mut PanOrbitCamera>,
+){
+    if !user_config.focus_selected || selected_nodes.is_empty() {
+        return;
+    }
+    let location_sums = selected_nodes.iter()
+        .map(|transform| {
+            transform.translation
+        })
+        .fold((0, Vec3::splat(0.0)), |acc, elem| {
+            (acc.0 + 1, acc.1 + elem)
+        });
+    let new_focus = location_sums.1 / (location_sums.0 as f32);
+    for mut orbit_camera in orbit_cameras.iter_mut() {
+        orbit_camera.target_focus = new_focus;
+    }
+}
+
 fn select_nodes_with_playing_games(
     mut commands: Commands,
     to_select: Query<Entity, (With<PlayingGameState>, Without<SelectedNode>)>,
@@ -540,7 +573,6 @@ fn on_space_pressed_clear_playing_nodes(
     }
 }
 
-
 fn select_initial_node(
     mut commands: Commands,
     graph_data: Res<SourceGraphData>,
@@ -552,7 +584,7 @@ fn select_initial_node(
         return;
     };
 
-    select_node(&mut commands, graph_data, &initial_id, node_entity)
+    select_node(&mut commands, &graph_data, &initial_id, node_entity)
 }
 
 fn on_space_pressed_start_playing_random_node(
@@ -590,56 +622,61 @@ fn on_node_clicked_toggle_playing_game(
             commands.entity(clicked_entity).remove::<PlayingGameState>();
         }
         None => {
-            select_node(&mut commands, graph_data, &clicked_node.id, clicked_entity);
+            select_node(&mut commands, &graph_data, &clicked_node.id, clicked_entity);
         }
     }
 }
 
 
-fn select_random_adjacent_node_when_space_bar_pressed(
+fn on_b_pressed_select_random_adjacent_node(
     mut commands: Commands,
-    unselected_nodes: Query<(Entity, &GraphNode), Without<SelectedNode>>,
+    past_selected_nodes: Query<(), Or<(With<RecentlySelectedNode>, With<SelectedNode>)>>,
     selected_nodes: Query<(Entity, &GraphNode), With<SelectedNode>>,
-    graph_data: Res<GraphData>,
+    source_graph_data: Res<SourceGraphData>,
+    graph_compute_cache: Res<GraphComputeCache>,
+    user_config: Res<UserConfig>,
+    time: Res<Time>,
     button_input: Res<ButtonInput<Key>>
 ) {
-    if !button_input.just_pressed(Key::Space) {
+    if !button_input.pressed(Key::Character("b".into())) {
+        return;
+    }
+
+    if selected_nodes.is_empty() {
+        return;
+    }
+
+    let total_to_select = user_config.get_total_to_select(&time);
+
+    if total_to_select <= 0 {
         return;
     }
 
     use rand::seq::IteratorRandom;
     let mut rng = rand::rng();
 
-    let last_selected_nodes = selected_nodes.iter().map(|(_, node)| node.id).collect::<Vec<_>>();
+    for (entity, node) in selected_nodes.iter().choose_multiple(&mut rng, total_to_select) {
+        let random_unselected_neighbor = graph_compute_cache.iterate_neighbors(&node.id)
+            .filter_map(|&neighbor_id| {
+                let &neighbor_entity = graph_compute_cache.get_entity(&neighbor_id).expect("every node must be in cache");
+                if past_selected_nodes.contains(neighbor_entity) {
+                    None
+                } else {
+                    Some((neighbor_id, neighbor_entity))
+                }
+            })
+            .choose(&mut rng);
 
-    let mut picked_entity = None;
-    if last_selected_nodes.len() > 0 {
-        let possible_next_nodes = graph_data.edges.iter()
-            .filter(|edge| last_selected_nodes.contains(&edge.from))
-            .map(|edge| edge.to)
-            .collect::<Vec<_>>();
-        if possible_next_nodes.len() > 0 {
-            picked_entity = unselected_nodes.iter()
-                .filter(|(_, node)| possible_next_nodes.contains(&node.id))
-                .map(|(entity, _)| entity)
-                .choose(&mut rng)
-        }
-    }
-
-    let picked_entity = match picked_entity {
-        Some(picked_entity) => Some(picked_entity),
-        None => {
-            // if there are no other ways to move through the graph, then, clear the entire selection and pick a new random node
-            for (selected_entity, _) in selected_nodes.iter() {
-                commands.entity(selected_entity).remove::<SelectedNode>();
+        match random_unselected_neighbor {
+            Some((to_select_id, to_select_entity)) => {
+                select_node(&mut commands, &source_graph_data, &to_select_id, to_select_entity);
             }
-
-            unselected_nodes.iter().choose(&mut rng).map(|x| x.0)
+            None => {
+                // if no neighbors left to visit, stop "selecting"
+                println!("Deselecting {}", node.id);
+                commands.entity(entity).remove::<PlayingGameState>();
+            }
         }
-    };
-
-    if let Some(picked_entity) = picked_entity {
-        commands.entity(picked_entity).insert(SelectedNode);
     }
 }
 
@@ -649,12 +686,12 @@ fn interpolate_color(on_targets: usize, max_on_targets: usize) -> Color {
     } else {
         on_targets as f32 / max_on_targets as f32
     };
-    
+
     Color::srgb(1.0 - t, 0.0, t)
 }
 
 
-fn select_node(commands: &mut Commands, graph_data: Res<SourceGraphData>, node_id: &usize, node_entity: Entity) {
+fn select_node(commands: &mut Commands, graph_data: &SourceGraphData, node_id: &usize, node_entity: Entity) {
     println!("Selecting {}", node_id);
     let unique_node = graph_data.graph.nodes.get_by_right(&node_id).expect("node id not found");
     commands.entity(node_entity).insert(PlayingGameState::new_playing_state(unique_node));

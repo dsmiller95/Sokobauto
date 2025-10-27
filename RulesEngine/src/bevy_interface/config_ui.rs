@@ -16,6 +16,7 @@ pub enum ToggleType {
     DisableRendering,
     FixedTimestepEnabled,
     HideNeverSelected,
+    FocusSelected,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +27,8 @@ pub enum SliderType {
     Damping,
     OctreeTheta,
     FixedTimestep,
+    MaxViewedGames,
+    RandomSelectsPerSecond,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,6 +76,7 @@ impl ToggleType {
             ToggleType::DisableRendering,
             ToggleType::FixedTimestepEnabled,
             ToggleType::HideNeverSelected,
+            ToggleType::FocusSelected,
         ]
     }
     
@@ -85,6 +89,7 @@ impl ToggleType {
             ToggleType::DisableRendering => "Disable Rendering",
             ToggleType::FixedTimestepEnabled => "Fixed Timestep?",
             ToggleType::HideNeverSelected => "Hide Unselected?",
+            ToggleType::FocusSelected => "Focus Selected?",
         }
     }
 
@@ -97,6 +102,7 @@ impl ToggleType {
             ToggleType::DisableRendering => user_config.disable_rendering,
             ToggleType::FixedTimestepEnabled => user_config.fixed_timestep.is_some(),
             ToggleType::HideNeverSelected => user_config.hide_never_selected,
+            ToggleType::FocusSelected => user_config.focus_selected,
         }
     }
 
@@ -109,6 +115,7 @@ impl ToggleType {
             ToggleType::DisableRendering => user_config.disable_rendering = value,
             ToggleType::FixedTimestepEnabled => user_config.fixed_timestep = if value { Some(0.25) } else { None },
             ToggleType::HideNeverSelected => user_config.hide_never_selected = value,
+            ToggleType::FocusSelected => user_config.focus_selected = value,
         }
     }
 
@@ -127,6 +134,8 @@ impl SliderType {
             SliderType::Damping,
             SliderType::OctreeTheta,
             SliderType::FixedTimestep,
+            SliderType::MaxViewedGames,
+            SliderType::RandomSelectsPerSecond,
         ]
     }
 
@@ -138,6 +147,8 @@ impl SliderType {
             SliderType::Damping => "Damping",
             SliderType::OctreeTheta => "Octree Theta",
             SliderType::FixedTimestep => "Timestep",
+            SliderType::MaxViewedGames => "Games",
+            SliderType::RandomSelectsPerSecond => "Selects/s",
         }
     }
 
@@ -149,6 +160,8 @@ impl SliderType {
             SliderType::Damping => physics_config.damping,
             SliderType::OctreeTheta => physics_config.octree_theta,
             SliderType::FixedTimestep => user_config.fixed_timestep.unwrap_or(0.0),
+            SliderType::MaxViewedGames => user_config.max_viewed_games,
+            SliderType::RandomSelectsPerSecond => user_config.random_selects_per_second,
         }
     }
 
@@ -160,6 +173,8 @@ impl SliderType {
             SliderType::Damping => physics_config.damping = value,
             SliderType::OctreeTheta => physics_config.octree_theta = value,
             SliderType::FixedTimestep => user_config.fixed_timestep = Some(value),
+            SliderType::MaxViewedGames => user_config.max_viewed_games = value,
+            SliderType::RandomSelectsPerSecond => user_config.random_selects_per_second = value,
         }
     }
 
@@ -171,6 +186,8 @@ impl SliderType {
             SliderType::Damping => (0.1, 1.0),
             SliderType::OctreeTheta => (0.2, 1.0),
             SliderType::FixedTimestep => (0.01, 0.5),
+            SliderType::MaxViewedGames => (0., 10.),
+            SliderType::RandomSelectsPerSecond => (100.0, 10000.0)
         }
     }
 }
