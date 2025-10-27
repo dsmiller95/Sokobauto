@@ -631,7 +631,7 @@ fn on_node_clicked_toggle_playing_game(
 fn on_b_pressed_select_random_adjacent_node(
     mut commands: Commands,
     past_selected_nodes: Query<(), Or<(With<RecentlySelectedNode>, With<SelectedNode>)>>,
-    selected_nodes: Query<(Entity, &GraphNode), With<SelectedNode>>,
+    selected_nodes: Query<(Entity, &GraphNode, &Transform), With<SelectedNode>>,
     source_graph_data: Res<SourceGraphData>,
     graph_compute_cache: Res<GraphComputeCache>,
     user_config: Res<UserConfig>,
@@ -655,10 +655,10 @@ fn on_b_pressed_select_random_adjacent_node(
     use rand::seq::IteratorRandom;
     let mut rng = rand::rng();
 
-    for (entity, node) in selected_nodes.iter().choose_multiple(&mut rng, total_to_select) {
+    for (entity, node, transform) in selected_nodes.iter().choose_multiple(&mut rng, total_to_select) {
         let random_unselected_neighbor = graph_compute_cache.iterate_neighbors(&node.id)
             .filter_map(|&neighbor_id| {
-                let &neighbor_entity = graph_compute_cache.get_entity(&neighbor_id).expect("every node must be in cache");
+                let &neighbor_entity = graph_compute_cache.get_entity(&neighbor_id).expect("every node must be in cache - neighbor");
                 if past_selected_nodes.contains(neighbor_entity) {
                     None
                 } else {
@@ -670,6 +670,10 @@ fn on_b_pressed_select_random_adjacent_node(
         match random_unselected_neighbor {
             Some((to_select_id, to_select_entity)) => {
                 select_node(&mut commands, &source_graph_data, &to_select_id, to_select_entity);
+
+                // place the new node right next to where its neighbor is
+                let jittered = *transform * Transform::from_translation(rng.random::<Vec3>() * 0.1);
+                commands.entity(to_select_entity).insert(jittered);
             }
             None => {
                 // if no neighbors left to visit, stop "selecting"
