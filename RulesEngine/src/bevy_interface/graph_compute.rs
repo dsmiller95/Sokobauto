@@ -146,6 +146,85 @@ pub fn setup_compute_cache(
     commands.insert_resource(compute_cache);
 }
 
+pub fn apply_forces_and_update_octree(
+    mut node_query: Query<(&mut Transform, &mut GraphNode, &Visibility)>,
+    mut node_positions: ResMut<NodePositions>,
+    compute_cache: Res<GraphComputeCache>,
+    physics: Res<PhysicsConfig>,
+    user_config: Res<UserConfig>,
+    mut octree_resource: ResMut<OctreeResource>,
+    time: Res<Time>,
+) {
+    if user_config.is_simulation_disabled(&time) {
+        return;
+    }
+
+    let dt = user_config.get_timestep_secs(&time);
+    let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
+        .filter_map(|(transform, node, visibility)| match visibility {
+            Visibility::Visible => Some((node.id, transform.translation)),
+            Visibility::Hidden => None,
+            Visibility::Inherited => Some((node.id, transform.translation)),
+        })
+        .collect();
+
+    let mut forces: HashMap<usize, Vec3> = HashMap::<usize, Vec3>::with_capacity(nodes_data.len());
+    match physics.physics_mode {
+        PhysicsMode::BruteForce => {
+            for (transform, node, visibility) in node_query.iter() {
+                if visibility == Visibility::Hidden {
+                    continue;
+                }
+                let mut force = Vec3::ZERO;
+                let current_pos = transform.translation;
+                for &(other_id, other_pos) in nodes_data.iter() {
+                    if node.id == other_id { continue; }
+                    let diff = current_pos - other_pos;
+                    let distance = diff.length().max(0.1);
+                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
+                    force += repulsion;
+                }
+                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
+                forces.insert(node.id, force);
+            }
+        }
+        PhysicsMode::Octree => {
+            let octree = &octree_resource.octree;
+            for (transform, node, visibility) in node_query.iter() {
+                if visibility == Visibility::Hidden {
+                    continue;
+                }
+                
+                let mut force = Vec3::ZERO;
+                let current_pos = transform.translation;
+                force += octree.calculate_force(
+                    current_pos,
+                    physics.octree_theta,
+                    physics.repulsion_strength,
+                );
+                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
+                forces.insert(node.id, force);
+            }
+        }
+    }
+
+    for (mut transform, mut node, visibility) in node_query.iter_mut() {
+        if visibility == Visibility::Hidden {
+            // TODO: handle this when it -becomes- hidden, rather than every frame while it is hidden?
+            octree_resource.octree.remove(node.id, transform.translation);
+            node_positions.positions.remove(&node.id);
+        }
+        if let Some(force) = forces.get(&node.id) {
+            let old_pos = transform.translation;
+            integrate_physics(&mut node, &mut transform, *force, &physics, dt);
+            let new_pos = transform.translation;
+
+            octree_resource.octree.upsert_resize(node.id, old_pos, new_pos, Bounds::resize_expand);
+            node_positions.positions.insert(node.id, new_pos);
+        }
+    }
+}
+
 fn apply_attraction_forces(
     node: &GraphNode,
     current_pos: Vec3,
@@ -183,68 +262,4 @@ fn integrate_physics(
     }
 
     transform.translation += node.velocity * dt;
-}
-
-pub fn apply_forces_and_update_octree(
-    mut node_query: Query<(&mut Transform, &mut GraphNode)>,
-    mut node_positions: ResMut<NodePositions>,
-    compute_cache: Res<GraphComputeCache>,
-    physics: Res<PhysicsConfig>,
-    user_config: Res<UserConfig>,
-    mut octree_resource: ResMut<OctreeResource>,
-    time: Res<Time>,
-) {
-    if user_config.is_simulation_disabled(&time) {
-        return;
-    }
-
-    let dt = user_config.get_timestep_secs(&time);
-    let nodes_data: Vec<(usize, Vec3)> = node_query.iter()
-        .map(|(transform, node)| (node.id, transform.translation))
-        .collect();
-
-    let mut forces: HashMap<usize, Vec3> = HashMap::<usize, Vec3>::with_capacity(nodes_data.len());
-    match physics.physics_mode {
-        PhysicsMode::BruteForce => {
-            for (transform, node) in node_query.iter() {
-                let mut force = Vec3::ZERO;
-                let current_pos = transform.translation;
-                for &(other_id, other_pos) in nodes_data.iter() {
-                    if node.id == other_id { continue; }
-                    let diff = current_pos - other_pos;
-                    let distance = diff.length().max(0.1);
-                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                    force += repulsion;
-                }
-                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
-                forces.insert(node.id, force);
-            }
-        }
-        PhysicsMode::Octree => {
-            let octree = &octree_resource.octree;
-            for (transform, node) in node_query.iter() {
-                let mut force = Vec3::ZERO;
-                let current_pos = transform.translation;
-                force += octree.calculate_force(
-                    current_pos,
-                    physics.octree_theta,
-                    physics.repulsion_strength,
-                );
-                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
-                forces.insert(node.id, force);
-            }
-        }
-    }
-
-
-    for (mut transform, mut node) in node_query.iter_mut() {
-        if let Some(force) = forces.get(&node.id) {
-            let old_pos = transform.translation;
-            integrate_physics(&mut node, &mut transform, *force, &physics, dt);
-            let new_pos = transform.translation;
-
-            octree_resource.octree.update_resize(node.id, old_pos, new_pos, Bounds::resize_expand);
-            node_positions.positions.insert(node.id, new_pos);
-        }
-    }
 }

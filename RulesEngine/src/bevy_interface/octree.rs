@@ -163,6 +163,14 @@ impl Octree {
         self.insert_resize(node_id, new_pos, NODE_MASS, resize);
         true
     }
+    
+    /// Returns true if the node was inserted, otherwise false 
+    pub fn upsert_resize(&mut self, node_id: usize, old_pos: Vec3, new_pos: Vec3, resize: impl FnOnce(&Bounds, &Vec3) -> Bounds) -> bool {
+        let removed = self.root.remove(node_id, old_pos, self.min_points_per_node);
+        self.insert_resize(node_id, new_pos, NODE_MASS, resize);
+        
+        !removed
+    }
 
     pub fn resize_bounds(&mut self, new_bounds: Bounds) {
         let all_points = self.get_all_points();
@@ -440,7 +448,7 @@ mod tests {
         ];
         let mut octree = Octree::from_points(&points, 3, 1, 1);
 
-        let updated = octree.update_resize(1, Vec3::splat(0.0), Vec3::splat(10.0), Bounds::resize_expand);
+        let updated = octree.upsert_resize(1, Vec3::splat(0.0), Vec3::splat(10.0), Bounds::resize_expand);
         assert!(updated);
 
         let expected_bounds = Bounds {
