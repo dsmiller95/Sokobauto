@@ -68,7 +68,6 @@ struct SourceGraphData {
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum PhysicsMode {
     Octree,
-    SpatialHash,
     BruteForce,
 }
 

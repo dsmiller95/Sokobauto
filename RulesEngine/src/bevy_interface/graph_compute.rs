@@ -220,25 +220,6 @@ pub fn apply_forces_and_update_octree(
                 forces.insert(node.id, force);
             }
         }
-        PhysicsMode::SpatialHash => {
-            let mut spatial_hash: SpatialHash<(usize, Vec3)> = SpatialHash::new(physics.spatial_hash_size);
-            for &(id, pos) in &nodes_data {
-                spatial_hash.insert(pos, (id, pos));
-            }
-            for (transform, node) in node_query.iter() {
-                let mut force = Vec3::ZERO;
-                let current_pos = transform.translation;
-                for &(other_id, other_pos) in spatial_hash.iter_all_nearby(current_pos) {
-                    if node.id == other_id { continue; }
-                    let diff = current_pos - other_pos;
-                    let distance = diff.length().max(0.1);
-                    let repulsion = diff.normalize() * physics.repulsion_strength / (distance * distance);
-                    force += repulsion;
-                }
-                force += apply_attraction_forces(&node, current_pos, &compute_cache, &node_positions, &physics);
-                forces.insert(node.id, force);
-            }
-        }
         PhysicsMode::Octree => {
             let octree = &octree_resource.octree;
             for (transform, node) in node_query.iter() {
