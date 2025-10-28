@@ -126,6 +126,17 @@ impl NodeIdToIndex {
         vertices
     }
 
+    pub fn get_indexed_vertex_positions_from_iter_query<'a>(&self, position_query: impl Iterator<Item=(&'a GraphNode, &'a Transform)>) -> Vec<Vec3> {
+        let mut vertices = vec![Vec3::ZERO; self.0.len()];
+        for (node, position) in position_query {
+            let index = self.get_index(&node.id);
+            if let Some(&index) = index {
+                vertices[index] = position.translation;
+            }
+        }
+        vertices
+    }
+
     pub fn get_index(&self, node_id: &usize) -> Option<&usize> {
         self.0.get(node_id)
     }
@@ -194,7 +205,7 @@ pub fn apply_forces_and_update_octree(
                 if visibility == Visibility::Hidden {
                     continue;
                 }
-                
+
                 let mut force = Vec3::ZERO;
                 let current_pos = transform.translation;
                 force += octree.calculate_force(

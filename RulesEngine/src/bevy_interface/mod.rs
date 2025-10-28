@@ -24,7 +24,7 @@ use crate::bevy_interface::octree::{Octree, OctreeResource};
 use crate::bevy_interface::config_ui::{setup_config_panel, handle_toggle_interactions, on_toggle_event, on_slider_event, ConfigChangedEvent, ConfigType, SliderType};
 use crate::bevy_interface::fps_ui::{setup_fps_counter, update_fps_counter};
 use crate::bevy_interface::octree_visualization::{setup_octree_visualization, update_octree_visualization, OctreeVisualizationConfig};
-use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh};
+use crate::bevy_interface::edge_renderer::{EdgeRenderPlugin, EdgeRenderData, spawn_edge_mesh, EdgeRenderSystemSet};
 use crate::bevy_interface::graph_compute::{apply_forces_and_update_octree, setup_compute_cache, AllEdgeIndexes, GraphComputeCache, GraphData, NodeIdToIndex};
 use crate::bevy_interface::node_selection::{NodeSelectionPlugin, RecentlySelectedNode, SelectedNode};
 use crate::bevy_interface::selected_game_navigation::{PlayingGameState, SelectedGameNavigationPlugin};
@@ -44,6 +44,13 @@ pub enum StartupSystemSet {
     General,
     AfterGraphNodesSpawned,
     AfterGraphComputeCache,
+}
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum UpdateSystemSet {
+    General,
+    MoveNodes,
+    Display,
 }
 
 #[derive(Component)]
@@ -195,6 +202,10 @@ pub fn visualize_graph(
             StartupSystemSet::AfterGraphComputeCache
                 .after(GraphNodeSpawnSystemSet::ComputeCacheSetup),
         ))
+        .configure_sets(Update, (
+            UpdateSystemSet::Display
+                .after(UpdateSystemSet::MoveNodes),
+        ))
         .add_systems(Startup, (
             (
                 setup_scene,
@@ -216,20 +227,27 @@ pub fn visualize_graph(
                 .in_set(StartupSystemSet::AfterGraphComputeCache),
         ))
         .add_systems(Update, (
-            apply_forces_and_update_octree, update_octree_visualization,
-            update_fps_counter,
-            handle_toggle_interactions))
-        .add_systems(Update, (
-            // on_space_pressed_clear_playing_nodes,
-            on_b_pressed_select_random_adjacent_node,
-            select_nodes_with_playing_games,
-            visualize_playing_games,
-            focus_all_selected_nodes, // focus_newly_selected_nodes,
-            display_only_recently_selected_nodes,
-        )).add_observer(on_node_clicked_toggle_playing_game);
+            (
+                update_fps_counter,
+                handle_toggle_interactions
+            ).in_set(UpdateSystemSet::General),
+            (
+                on_b_pressed_select_random_adjacent_node,
+                apply_forces_and_update_octree,
+            ).in_set(UpdateSystemSet::MoveNodes),
+            (
+                update_octree_visualization,
+                // on_space_pressed_clear_playing_nodes,
+                select_nodes_with_playing_games,
+                visualize_playing_games,
+                focus_all_selected_nodes, // focus_newly_selected_nodes,
+                display_only_recently_selected_nodes,
+            ).in_set(UpdateSystemSet::Display)
+        ))
+        .add_observer(on_node_clicked_toggle_playing_game);
 
     app.add_systems(Startup, spawn_edge_mesh.after(setup_graph_from_data))
-        .add_systems(Update, update_shader_edge_data);
+        .add_systems(Update, update_shader_edge_data.before(EdgeRenderSystemSet::UpdateEdgeMesh).after(UpdateSystemSet::Display));
 
     app
         .add_observer(on_toggle_event)
@@ -410,20 +428,17 @@ fn setup_octree_resource(
 }
 
 fn update_shader_edge_data(
-    node_positions: Res<NodePositions>,
     node_id_to_index: Res<NodeIdToIndex>,
-    compute_cache: Res<GraphComputeCache>,
     all_edges: Res<AllEdgeIndexes>,
     mut edge_data: ResMut<EdgeRenderData>,
-    time: Res<Time>,
     user_config: Res<UserConfig>,
-    visibility_query: Query<(&GraphNode, &Visibility)>,
+    visibility_query: Query<(&GraphNode, &Visibility, &Transform)>,
 ) {
     if user_config.is_rendering_disabled() {
         return;
     }
 
-    let visible_indexes: HashSet<u32> = visibility_query.iter().filter_map(|(node, visibility)| {
+    let visible_indexes: HashSet<u32> = visibility_query.iter().filter_map(|(node, visibility, transform)| {
         if visibility == Visibility::Visible {
             node_id_to_index.get_index(&node.id).map(|&x| x as u32)
         } else {
@@ -431,7 +446,13 @@ fn update_shader_edge_data(
         }
     }).collect();
 
-    let vertices = node_id_to_index.get_indexed_vertex_positions(node_positions.as_ref());
+    let vertices = node_id_to_index.get_indexed_vertex_positions_from_iter_query(visibility_query.iter().filter_map(|(node, visibility, transform)| {
+        if visibility == Visibility::Visible {
+            Some((node, transform))
+        } else {
+            None
+        }
+    }));
 
     edge_data.update_vertices(vertices);
 
@@ -634,6 +655,7 @@ fn on_b_pressed_select_random_adjacent_node(
     selected_nodes: Query<(Entity, &GraphNode, &Transform), With<SelectedNode>>,
     source_graph_data: Res<SourceGraphData>,
     graph_compute_cache: Res<GraphComputeCache>,
+    mut node_positions: ResMut<NodePositions>,
     user_config: Res<UserConfig>,
     time: Res<Time>,
     button_input: Res<ButtonInput<Key>>
@@ -673,6 +695,8 @@ fn on_b_pressed_select_random_adjacent_node(
 
                 // place the new node right next to where its neighbor is
                 let jittered = *transform * Transform::from_translation(rng.random::<Vec3>() * 0.1);
+                let new_pos = jittered.translation;
+                node_positions.positions.insert(to_select_id, new_pos);
                 commands.entity(to_select_entity).insert(jittered);
             }
             None => {

@@ -4,12 +4,17 @@ use bevy::prelude::*;
 
 use super::resources::EdgeRenderData;
 
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum EdgeRenderSystemSet {
+    UpdateEdgeMesh,
+}
+
 pub struct EdgeRenderPlugin;
 
 impl Plugin for EdgeRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EdgeRenderData>()
-            .add_systems(Update, update_edge_mesh);
+            .add_systems(Update, update_edge_mesh.in_set(EdgeRenderSystemSet::UpdateEdgeMesh));
     }
 }
 
