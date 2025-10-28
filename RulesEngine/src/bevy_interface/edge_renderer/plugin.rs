@@ -33,8 +33,10 @@ pub fn spawn_edge_mesh(
 
     let mesh = create_edge_mesh(&edge_data);
     let mesh_handle = meshes.add(mesh);
-    let material_handle = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.7, 0.7, 0.7),
+
+    let material_handle = materials.add(  StandardMaterial {
+        base_color: Color::srgba(1., 1., 1., 0.1),
+        alpha_mode: AlphaMode::Blend,
         unlit: true,
         ..default()
     });
