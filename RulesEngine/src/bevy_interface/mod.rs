@@ -237,7 +237,7 @@ pub fn visualize_graph(
             ).in_set(UpdateSystemSet::MoveNodes),
             (
                 update_octree_visualization,
-                // on_space_pressed_clear_playing_nodes,
+                on_space_pressed_clear_recently_selected_nodes,
                 select_nodes_with_playing_games,
                 visualize_playing_games,
                 focus_all_selected_nodes, // focus_newly_selected_nodes,
@@ -580,17 +580,17 @@ fn select_nodes_with_playing_games(
     }
 }
 
-fn on_space_pressed_clear_playing_nodes(
+fn on_space_pressed_clear_recently_selected_nodes(
     mut commands: Commands,
-    playing_nodes: Query<(Entity), With<PlayingGameState>>,
+    recently_selected_nodes: Query<(Entity), With<RecentlySelectedNode>>,
     button_input: Res<ButtonInput<Key>>
 ) {
     if !button_input.just_pressed(Key::Space) {
         return;
     }
 
-    for entity in playing_nodes.iter() {
-        commands.entity(entity).remove::<PlayingGameState>();
+    for entity in recently_selected_nodes.iter() {
+        commands.entity(entity).remove::<RecentlySelectedNode>();
     }
 }
 
