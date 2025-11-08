@@ -41,41 +41,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // #..#   #
     // ########
     //     "#;
+//     let level = r#"
+//  ########
+//  #  ##  ####
+//  # @$   #  ####
+//  # ##$ $   #  #
+//  # ##  #$ $   ###
+//  # #####  #$ $  #
+//  # #   ####  #$ #
+//  # ##     ####  #
+// ## .##       # ##
+// #.  .##      # #
+// #..  .##     # ##
+// ###   .#######  #
+//   #  # .        #
+//   ###############
+// "#;
+//     let level = r#"
+//    ######
+// ####..$@#
+// #   #..*#
+// #    #* #
+// # $#$ ..#
+// # $ $ $ #
+// #      ##
+// ########
+// "#;
+//     let level = r#"
+//     #####
+// #####@. #
+// #   #.**#
+// #  $ #..#
+// #  #   .#
+// # $$$$ *#
+// #    #  #
+// #########
+// "#;
     let level = r#"
- ########
- #  ##  ####
- # @$   #  ####
- # ##$ $   #  #
- # ##  #$ $   ###
- # #####  #$ $  #
- # #   ####  #$ #
- # ##     ####  #
-## .##       # ##
-#.  .##      # #
-#..  .##     # ##
-###   .#######  #
-  #  # .        #
-  ###############
-"#;
-    let level = r#"
-   ######
-####..$@#
-#   #..*#
-#    #* #
-# $#$ ..#
-# $ $ $ #
-#      ##
-########
-"#;
-    let level = r#"
-    #####
-#####@. #
-#   #.**#
-#  $ #..#
-#  #   .#
-# $$$$ *#
-#    #  #
-#########
+ ### ### 
+#   #  .#
+#   # . #
+##$     #
+ # $.* #
+  # $##
+   #@#
+    #
 "#;
 
     let (game_state, shared) = parse_level(level);
@@ -107,7 +117,7 @@ fn run_state_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut state_graph = StateGraph::new();
     let first_node = UniqueNode::from_game_state(game_state, shared);
-    state_graph.upsert_state(first_node);
+    let first_state_id = state_graph.upsert_state(first_node);
 
     let start_time = std::time::Instant::now();
     let mut last_render_time = start_time;
@@ -176,7 +186,7 @@ fn run_state_graph(
     
     // Launch 3D graph visualization
     println!("Launching 3D graph visualization...");
-    crate::bevy_interface::visualize_graph(&state_graph, shared);
+    crate::bevy_interface::visualize_graph(first_state_id, &state_graph, shared);
     
     Ok(())
 }
