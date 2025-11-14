@@ -238,6 +238,7 @@ pub fn visualize_graph(
             (
                 update_octree_visualization,
                 on_space_pressed_clear_recently_selected_nodes,
+                on_c_pressed_clear_all_selected_nodes,
                 select_nodes_with_playing_games,
                 visualize_playing_games,
                 focus_all_selected_nodes, // focus_newly_selected_nodes,
@@ -577,6 +578,25 @@ fn select_nodes_with_playing_games(
     }
     for entity in to_unselect.iter() {
         commands.entity(entity).remove::<SelectedNode>();
+    }
+}
+
+fn on_c_pressed_clear_all_selected_nodes(
+    mut commands: Commands,
+    recently_selected_nodes: Query<(Entity), With<RecentlySelectedNode>>,
+    selected_nodes: Query<(Entity), With<PlayingGameState>>,
+    button_input: Res<ButtonInput<Key>>
+) {
+    if !button_input.just_pressed(Key::Character("c".into())) {
+        return;
+    }
+
+    for entity in recently_selected_nodes.iter() {
+        commands.entity(entity).remove::<RecentlySelectedNode>();
+    }
+
+    for entity in selected_nodes.iter() {
+    commands.entity(entity).remove::<PlayingGameState>();
     }
 }
 
